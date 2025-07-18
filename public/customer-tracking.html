@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Order Tracking - NextPrint</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body { background-color: #f8f9fa; }
+    .stage {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stage.done { background-color: #d4edda; }
+    .stage span { font-weight: bold; }
+  </style>
+</head>
+<body class="container p-4">
+
+  <h3 class="mb-4 text-center">Order Tracking</h3>
+  <div id="orderDetails" class="mb-4 text-center">
+    <p><strong>Order ID:</strong> <span id="orderId">Loading...</span></p>
+    <p><strong>Customer:</strong> <span id="customerName">Loading...</span></p>
+  </div>
+
+  <div id="stages">
+    <div class="stage" id="stage-design"><span>🎨 Design</span> <span class="status">Pending</span></div>
+    <div class="stage" id="stage-printing"><span>🖨 Printing</span> <span class="status">Pending</span></div>
+    <div class="stage" id="stage-fusing"><span>🔧 Fusing</span> <span class="status">Pending</span></div>
+    <div class="stage" id="stage-stitching"><span>🧵 Stitching</span> <span class="status">Pending</span></div>
+    <div class="stage" id="stage-shipping"><span>📦 Shipping</span> <span class="status">Pending</span></div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderId = urlParams.get('order_id') || '';
+    document.getElementById('orderId').innerText = orderId;
+
+    async function loadOrderStatus() {
+      try {
+        const res = await fetch(`/api/get-order/${orderId}`);
+        const data = await res.json();
+        if (data.order) {
+          const o = data.order;
+          document.getElementById('customerName').innerText = o.customer_name || 'Unknown';
+          updateStage('design', o.design_done);
+          updateStage('printing', o.printing_done);
+          updateStage('fusing', o.fusing_done);
+          updateStage('stitching', o.stitching_done);
+          updateStage('shipping', o.shipping_done);
+
+          // Register push notifications for this real customer
+          registerCustomerPush(o.customer_name);
+        } else {
+          document.getElementById('customerName').innerText = 'Order not found';
+        }
+      } catch (err) {
+        console.error('Error loading order:', err);
+      }
+    }
+
+    function updateStage(stage, done) {
+      const el = document.getElementById(`stage-${stage}`);
+      const statusEl = el.querySelector('.status');
+      if (done == 1 || done === 'Done') {
+        el.classList.add('done');
+        statusEl.innerText = 'Done';
+      } else {
+        el.classList.remove('done');
+        statusEl.innerText = 'Pending';
+      }
+    }
+
+    // Register customer's push notification
+    async function registerCustomerPush(customerName) {
+      if (!customerName) return;
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        try {
+          const registration = await navigator.serviceWorker.register('/sw.js');
+          const permission = await Notification.requestPermission();
+          if (permission === 'granted') {
+            const subscription = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: 'BLz5GsETNJHyDl_JPoR3iwHkFSrT1miycKKww-lSAfjXFg-gI3Mn2hKo2-IB01eF_BoNdtPv5TS6z08bwcuKAas'
+            });
+            await fetch('/api/save-customer-subscription', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: customerName, subscription })
+            });
+            console.log('Push subscription registered for:', customerName);
+          }
+        } catch (err) {
+          console.error('Push registration failed:', err);
+        }
+      }
+    }
+
+    loadOrderStatus();
+  </script>
+</body>
+</html>

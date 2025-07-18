@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Order Production Tracker</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body            { background:#f4f6f9; }
+    .badge-pending  { background:#ffc107;color:#000;border-radius:50px;padding:.4em .8em; }
+    .badge-done     { background:#198754;border-radius:50px;padding:.4em .8em; }
+    .badge-assign   { background:#0d6efd;border-radius:50px;padding:.4em .8em; }
+    .search-bar i   { position:absolute;top:50%;left:15px;transform:translateY(-50%);color:#aaa; }
+    .search-bar input{ border-radius:50px;padding-left:35px; }
+    .card           { border:none;border-radius:12px;box-shadow:0 0 15px rgba(0,0,0,.05); }
+    .btn-add        { border-radius:50px; }
+  </style>
+</head>
+<body class="p-4">
+<div class="container-fluid">
+  <!-- TOP BAR -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="fas fa-clipboard-list"></i> Order Production Tracker</h3>
+    <div><span>👤 <b id="loggedUser"></b></span>
+      <button class="btn btn-sm btn-danger ms-2" onclick="logout()">Logout</button>
+    </div>
+  </div>  
+   <!-- Search bar + order count -->
+    <div class="d-flex justify-content-between align-items-center my-3">
+      <h5 id="orderCount" class="mb-0"></h5>
+      <input type="text" id="searchInput" class="form-control w-25"
+            placeholder="Search Order ID…" onkeyup="filterOrders()">
+    </div>
+
+    <div id="summaryBox" style="display: none; margin-bottom: 20px;">
+  <label><strong>Select Date:</strong></label>
+  <input type="date" id="summaryDate">
+  <button onclick="fetchSummary()">Get Summary</button>
+  <div id="summaryResult" style="margin-top: 10px; font-weight: bold;"></div>
+</div>
+
+  <!-- ORDER TABLE -->
+  <div class="card p-3">
+    <div class="table-responsive">
+      <table class="table table-hover">
+        <thead class="table-light">
+          <tr id="theadRow"></tr>
+        </thead>
+        <tbody id="ordersTable"></tbody>
+      </table>
+      <div id="orderCount" class="text-muted small mt-2"></div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/* ───────────── Config ───────────── */
+const stages   = ['design','printing','fusing','stitching','shipping'];
+const allCols = [
+  "order-id", "customer", "design", "design_assignee", "design_preview",
+  "printing", "fusing", "stitching", "shipping", "updated",
+  "price", "fulfillment", "payment", "shiptype", "items", "tags", "address", "actions"
+];
+
+const roleCols = {
+  admin:     ['order-id', 'customer', 'design', 'design_assignee', 'design_preview', 'printing', 'fusing', 'stitching', 'shipping', 'updated', 'actions'],
+  customer:  ['order-id', 'customer', 'design', 'design_assignee', 'design_preview', 'updated'],
+  design:    ['order-id', 'customer', 'design', 'updated', 'actions'],
+  printing:  ['order-id', 'customer', 'design_preview', 'updated', 'actions'],
+  fusing:    ['order-id', 'customer', 'design_preview', 'updated', 'actions'],
+  stitching: ['order-id', 'customer', 'design_preview', 'updated', 'actions'],
+  shipping:  ['order-id', 'customer', 'design_preview', 'updated', 'actions']
+};
+
+let userRole='', username='';
+let allOrders   = [];
+let filteredOrders = [];
+
+/* ───────────── Auth helpers ───────────── */
+function logout(){ localStorage.clear(); location.href = '/login'; }
+function checkLogin(){
+  userRole = localStorage.getItem('role') || 'admin';
+  username = localStorage.getItem('username') || '';
+  if(!username) location.href = '/login';
+  document.getElementById('loggedUser').innerText = `${username} (${userRole})`;
+}
+
+/* ───────────── Column visibility ───────────── */
+function applyRoleVisibility(){
+  const visible = roleCols[userRole] || allCols;
+  allCols.forEach(col=>{
+    const th  = document.querySelector(`th[data-column="${col}"]`);
+    const tds = document.querySelectorAll(`td[data-column="${col}"]`);
+    const dsp = visible.includes(col)?'':'none';
+    if (th) th.style.display = dsp;
+    tds.forEach(td=>td.style.display=dsp);
+  });
+}
+
+/* ───────────── Fetch orders ───────────── */
+async function loadOrders() {
+  userRole = localStorage.getItem('role');
+  username = localStorage.getItem('username');
+
+  if (!username || !userRole) {
+    alert('User session not found. Please log in again.');
+    return;
+  }
+
+  const res = await fetch('/api/orders', {
+    headers: { 'x-user-role': userRole, 'x-user-name': username }
+  });
+  const data = await res.json();
+  allOrders = data.orders || [];
+
+  // ✅ If role is "design", filter orders assigned only to this designer user
+  if (userRole.startsWith('design_user')) {
+    filteredOrders = allOrders.filter(o => o.design_assignee === username);
+  } else {
+    filteredOrders = [...allOrders];
+  }
+
+  renderTable();
+}
+
+
+/* ───────────── Search filter ───────────── */
+function filterOrders(){
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  filteredOrders = allOrders.filter(o=>{
+    const oid = (o.order_name || o.order_id || '').toString().toLowerCase();
+    return oid.includes(q);
+  });
+  renderTable();
+}
+
+/* ───────────── Assign designer ───────────── */
+async function assignDesigner(orderId){
+  const select   = document.querySelector(`select[data-order-id="${orderId}"]`);
+  const designer = select.value;
+  if(!designer){ alert("Pick a designer first"); return; }
+
+  const res  = await fetch('/api/assign-designer',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ order_id:orderId, designer })
+  });
+  const data = await res.json();
+  if(data.success){ alert('Assigned successfully!'); await loadOrders(); }
+  else alert('Assignment failed');
+}
+
+/* ───────────── Preview & upload helper ───────────── */
+function preview(id){
+  const inp = document.getElementById(`file-${id}`);
+  const img = document.getElementById(`thumb-${id}`);
+  if (inp.files[0]){ img.src = URL.createObjectURL(inp.files[0]); img.style.display='block'; }
+}
+async function uploadThenDone(orderId){
+  const file = document.getElementById(`file-${orderId}`).files[0];
+  if (!file) return alert('Choose file first.');
+  const formData = new FormData(); formData.append('image',file); formData.append('orderId',orderId);
+  const res = await fetch('/api/upload-design',{method:'POST',body:formData});
+  const d   = await res.json();
+  if(d.success){ alert('Uploaded!'); await loadOrders(); } else alert('Upload failed');
+}
+
+/* ───────────── Quick done for later stages ───────────── */
+async function quickDone(orderId) {
+  if (!confirm("Are you sure you want to mark this stage as DONE?")) return;
+
+  const res = await fetch('/api/mark-stage-done', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orderId, stage: userRole })  // stage = userRole like 'printing'
+  });
+
+  const data = await res.json();
+  if (data.success) {
+    alert('Marked as Done!');
+    await loadOrders();
+  } else {
+    alert('Failed to update. Please try again.');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const role = localStorage.getItem('role');
+  if (role === 'admin') {
+    document.getElementById('summaryBox').style.display = 'block';
+  }
+});
+
+async function fetchSummary() {
+  const date = document.getElementById('summaryDate').value;
+  if (!date) return alert('Please select a date.');
+
+  const res = await fetch('/api/pending-summary', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date })
+  });
+
+  const data = await res.json();
+  if (data.error) {
+    alert('Error fetching summary.');
+    return;
+  }
+
+  const design = Number(data.design_pending);
+  const printing = Number(data.printing_pending);
+  const fusing = Number(data.fusing_pending);
+  const stitching = Number(data.stitching_pending);
+  const shipping = Number(data.shipping_pending);
+
+  const total = design + printing + fusing + stitching + shipping;
+
+  document.getElementById('summaryResult').innerText =
+    `Design: ${design}, Printing: ${printing}, Fusing: ${fusing}, Stitching: ${stitching}, Shipping: ${shipping}, Total: ${total}`;
+}
+
+function getStatusBadge(value) {
+  return value == 1
+    ? '<span class="badge bg-success">Done</span>'
+    : '<span class="badge bg-warning text-dark">Pending</span>';
+}
+
+/* ───────────── Render table ───────────── */
+function renderTable(){
+  const tbody = document.getElementById('ordersTable');
+  const thead = document.getElementById('theadRow');
+  tbody.innerHTML = ''; thead.innerHTML = '';
+
+  const visible = roleCols[userRole] || allCols;
+
+  visible.forEach(col=>{
+    const th=document.createElement('th');
+    th.setAttribute('data-column',col);
+    th.innerText = col.replace(/_/g,' ').replace('-',' ').toUpperCase();
+    thead.appendChild(th);
+  });
+
+  filteredOrders.forEach(r=>{
+    const tr=document.createElement('tr'); let html='';
+    visible.forEach(col=>{
+      let value='-';
+      if(col==='order-id')      value = r.order_name || r.order_id;
+      else if(col==='customer') value = r.customer_name || '-';
+      else if (stages.includes(col)) {
+        value = getStatusBadge(r[col + '_done']);
+      }
+      else if(col==='design_assignee'){
+        if(userRole==='customer' && !r.design_assignee){
+           value=`<div class="d-flex align-items-center gap-1">
+             <select class="form-select form-select-sm" data-order-id="${r.order_id}">
+               <option value="">Assign…</option>
+               <option value="design_user1">Design User 1</option>
+               <option value="design_user2">Design User 2</option>
+               <option value="design_user3">Design User 3</option>
+             </select>
+             <button class="btn btn-sm btn-primary" onclick="assignDesigner('${r.order_id}')">Assign</button>
+           </div>`;
+        } else value = r.design_assignee ? `<span class="badge badge-assign">${r.design_assignee}</span>` : '-';
+      }
+      else if(col==='design_preview'){
+        value = r.design_image
+          ? `<img src="/uploads/${r.design_image}" style="max-width:90px;border:1px solid #ccc;cursor:pointer"
+                 title="Click to enlarge" onclick="window.open('/uploads/${r.design_image}','_blank')">`
+          : '-';
+      }
+      else if(col==='updated') value = new Date(r.updated_at).toLocaleString();
+      else if(col==='actions'){
+        if(userRole.startsWith('design') && !r.design_done && r.design_assignee===username){
+          value=`<div class="d-flex flex-column gap-1">
+              <input type="file" id="file-${r.order_id}" class="form-control form-control-sm"
+                     accept="image/*" onchange="preview('${r.order_id}')">
+              <img id="thumb-${r.order_id}" style="max-width:90px;display:none;border:1px solid #ccc">
+              <button class="btn btn-sm btn-success mt-1" onclick="uploadThenDone('${r.order_id}')">
+                Upload & Done
+              </button>
+            </div>`;
+        } else if(
+          (userRole==='printing'  && !r.printing_done) ||
+          (userRole==='fusing'    && !r.fusing_done)   ||
+          (userRole==='stitching' && !r.stitching_done)||
+          (userRole==='shipping'  && !r.shipping_done)
+        ){
+          value=`<button class="btn btn-sm btn-success" onclick="quickDone('${r.order_id}')">
+                   Mark as Done
+                 </button>`;
+        }
+      } else value = r[col] ?? '-';
+
+      html += `<td data-column="${col}">${value}</td>`;
+    });
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('orderCount').innerText =
+    `Showing ${filteredOrders.length} orders`;
+  applyRoleVisibility();
+}
+
+window.onload = async () => {
+  checkLogin();
+  await loadOrders();
+};
+</script>
+</body>
+</html>

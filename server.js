@@ -377,7 +377,7 @@ app.post('/api/pending-summary', async (req, res) => {
 });
 
 /* ── 8.  Static login page ─────────────────────────────────── */
-app.get('/login', (_req, res) => {
+app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 

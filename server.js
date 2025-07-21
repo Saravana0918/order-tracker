@@ -1,5 +1,5 @@
 /***************************
- * server.js (Customer-Specific Push)
+ * server.js (Optimized with Sync Orders)
  ***************************/
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
@@ -24,7 +24,6 @@ const {
   DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT,
   SHOPIFY_STORE, SHOPIFY_ADMIN_API_TOKEN
 } = process.env;
-
 
 app.use(cors());
 app.use(express.json());
@@ -82,8 +81,6 @@ app.post('/api/upload-design', upload.single('image'), async (req, res) => {
   }
 });
 
-
-
 /* -------- Assign designer -------- */
 app.post('/api/assign-designer', async (req, res) => {
   const { order_id, designer } = req.body;
@@ -134,161 +131,111 @@ app.post('/api/mark-stage-done', async (req, res) => {
   }
 });
 
-
-/* -------- Fetch Orders -------- */
+/* -------- Fetch Orders (Fast) -------- */
 app.get('/api/orders', async (req, res) => {
   const role = req.headers['x-user-role'];
   const user = req.headers['x-user-name'];
 
   try {
-    if (role === 'admin' || role === 'customer') {
-      const shopifyRes = await axios.get(`https://${SHOPIFY_STORE}/admin/api/2023-10/orders.json`, {
-        headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_API_TOKEN },
-        params: { status: 'any', limit: 50 }
-      });
-
-      const orders = shopifyRes.data.orders;
-      for (const o of orders) {
-        const orderId = o.id.toString();
-        const [exists] = await pool.execute('SELECT 1 FROM order_progress WHERE order_id = ?', [orderId]);
-
-        const customerName = `${o.customer?.first_name || ''} ${o.customer?.last_name || ''}`.trim();
-        const address = o.shipping_address
-          ? `${o.shipping_address.address1 || ''}, ${o.shipping_address.city || ''}, ${o.shipping_address.province || ''}, ${o.shipping_address.country || ''}, ${o.shipping_address.zip || ''}`
-          : '';
-
-        if (!exists.length) {
-          await pool.execute(
-            `INSERT INTO order_progress (
-              order_id, order_name, customer_name,
-              total_price, fulfillment_status, payment_status,
-              shipping_method, item_count, tags, address, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-            [
-              orderId, o.name, customerName,
-              o.total_price || 0,
-              o.fulfillment_status || '',
-              o.financial_status || '',
-              o.shipping_lines?.[0]?.title || '',
-              o.line_items?.length || 0,
-              o.tags || '',
-              address
-            ]
-          );
-        } else {
-          await pool.execute(
-            `UPDATE order_progress SET
-              customer_name     = ?,
-              total_price       = ?,
-              fulfillment_status= ?,
-              payment_status    = ?,
-              shipping_method   = ?,
-              item_count        = ?,
-              tags              = ?,
-              address           = ?,
-              updated_at        = NOW()
-             WHERE order_id     = ?`,
-            [
-              customerName,
-              o.total_price || 0,
-              o.fulfillment_status || '',
-              o.financial_status || '',
-              o.shipping_lines?.[0]?.title || '',
-              o.line_items?.length || 0,
-              o.tags || '',
-              address,
-              orderId
-            ]
-          );
-        }
-      }
-
-      const [rows] = await pool.execute(`
-        SELECT
-          order_id,
-          order_name,
-          customer_name,
-          total_price        AS price,
-          fulfillment_status AS fulfillment,
-          payment_status     AS payment,
-          shipping_method    AS shiptype,
-          item_count         AS items,
-          tags,
-          address,
-          design_done,
-          printing_done,
-          fusing_done,
-          stitching_done,
-          shipping_done,
-          updated_at,
-          design_image,
-          design_assignee
-        FROM order_progress
-        ORDER BY updated_at DESC
-      `);
-      return res.json({ orders: rows });
-    }
-
-    // Designer role
-    let sql = 'SELECT * FROM order_progress WHERE 1=1';
+    let sql = `
+      SELECT
+        order_id,
+        order_name,
+        customer_name,
+        total_price        AS price,
+        fulfillment_status AS fulfillment,
+        payment_status     AS payment,
+        shipping_method    AS shiptype,
+        item_count         AS items,
+        tags,
+        address,
+        design_done,
+        printing_done,
+        fusing_done,
+        stitching_done,
+        shipping_done,
+        updated_at,
+        design_image,
+        design_assignee
+      FROM order_progress
+    `;
     const params = [];
 
     if (role === 'design') {
-      sql += ' AND (design_done IS NULL OR design_done = 0) AND design_assignee = ?';
+      sql += ' WHERE (design_done IS NULL OR design_done = 0) AND design_assignee = ?';
       params.push(user);
     } else if (role === 'printing') {
-      sql += ' AND design_done = 1 AND printing_done = 0';
+      sql += ' WHERE design_done = 1 AND printing_done = 0';
     } else if (role === 'fusing') {
-      sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 0';
+      sql += ' WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 0';
     } else if (role === 'stitching') {
-      sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 0';
+      sql += ' WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 0';
     } else if (role === 'shipping') {
-      sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0';
+      sql += ' WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0';
     }
 
     sql += ' ORDER BY updated_at DESC';
     const [rows] = await pool.execute(sql, params);
     res.json({ orders: rows });
-
   } catch (err) {
     console.error('❌ Error loading orders:', err);
     res.status(500).json({ error: 'Failed to load orders' });
   }
 });
 
-/* ── 5.  Manual “import Shopify” button (if you still need it) ─ */
-app.post('/api/fetch-shopify-orders', async (_, res) => {
+/* -------- Sync Shopify Orders (Manual Refresh) -------- */
+app.post('/api/sync-orders', async (req, res) => {
   try {
-    const response = await axios.get(
+    const shopifyRes = await axios.get(
       `https://${SHOPIFY_STORE}/admin/api/2023-10/orders.json`,
       {
         headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_API_TOKEN },
-        params : { status:'any', limit:50 }
+        params: { status: 'any', limit: 50 }
       }
     );
 
     let imported = 0;
-    for (const o of response.data.orders) {
+    for (const o of shopifyRes.data.orders) {
       const orderId = o.id.toString();
-      const [r] = await db.execute(
-        `INSERT IGNORE INTO order_progress
-           (order_id, order_name, customer_name, updated_at)
-         VALUES (?,?,?,NOW())`,
-        [
-          orderId,
-          o.name,
-          `${o.customer?.first_name || ''} ${o.customer?.last_name || ''}`.trim()
-        ]
+      const [exists] = await pool.execute(
+        'SELECT 1 FROM order_progress WHERE order_id = ?',
+        [orderId]
       );
-      if (r.affectedRows) imported++;
+
+      const customerName = `${o.customer?.first_name || ''} ${o.customer?.last_name || ''}`.trim();
+      const address = o.shipping_address
+        ? `${o.shipping_address.address1 || ''}, ${o.shipping_address.city || ''}, ${o.shipping_address.province || ''}, ${o.shipping_address.country || ''}, ${o.shipping_address.zip || ''}`
+        : '';
+
+      if (!exists.length) {
+        await pool.execute(
+          `INSERT INTO order_progress (
+            order_id, order_name, customer_name,
+            total_price, fulfillment_status, payment_status,
+            shipping_method, item_count, tags, address, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [
+            orderId, o.name, customerName,
+            o.total_price || 0,
+            o.fulfillment_status || '',
+            o.financial_status || '',
+            o.shipping_lines?.[0]?.title || '',
+            o.line_items?.length || 0,
+            o.tags || '',
+            address
+          ]
+        );
+        imported++;
+      }
     }
 
-    res.json({ success:true, imported });
+    res.json({ success: true, imported });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success:false, error:'Shopify fetch failed' });
+    console.error('Sync error:', err);
+    res.status(500).json({ success: false, error: 'Shopify sync failed' });
   }
 });
+
 
 /* -------- Login -------- */
 app.post('/api/login', async (req, res) => {
@@ -390,3 +337,4 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+

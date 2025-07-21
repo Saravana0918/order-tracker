@@ -21,11 +21,13 @@
 <div class="container-fluid">
   <!-- TOP BAR -->
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <h3><i class="fas fa-clipboard-list"></i> Order Production Tracker</h3>
-    <div><span>👤 <b id="loggedUser"></b></span>
-      <button class="btn btn-sm btn-danger ms-2" onclick="logout()">Logout</button>
-    </div>
-  </div>  
+  <h3><i class="fas fa-clipboard-list"></i> Order Production Tracker</h3>
+  <div>
+    <span>👤 <b id="loggedUser"></b></span>
+    <button class="btn btn-sm btn-primary ms-2" onclick="syncOrders()">Sync Orders</button>
+    <button class="btn btn-sm btn-danger ms-2" onclick="logout()">Logout</button>
+  </div>
+</div>  
    <!-- Search bar + order count -->
     <div class="d-flex justify-content-between align-items-center my-3">
       <h5 id="orderCount" class="mb-0"></h5>
@@ -224,6 +226,32 @@ function getStatusBadge(value) {
   return value == 1
     ? '<span class="badge bg-success">Done</span>'
     : '<span class="badge bg-warning text-dark">Pending</span>';
+}
+
+async function syncOrders() {
+  if (!confirm('Do you want to fetch the latest orders from Shopify?')) return;
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.innerText = 'Syncing...';
+
+  try {
+    const res = await fetch('/api/sync-orders', { method: 'POST' });
+    const data = await res.json();
+
+    if (data.success) {
+      alert(`Orders synced successfully! ${data.imported} new orders added/updated.`);
+      await loadOrders();
+    } else {
+      alert('Failed to sync orders: ' + (data.error || 'Unknown error'));
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Sync failed, please try again.');
+  } finally {
+    btn.disabled = false;
+    btn.innerText = 'Sync Orders';
+  }
 }
 
 /* ───────────── Render table ───────────── */

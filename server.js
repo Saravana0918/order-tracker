@@ -35,13 +35,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
 // MySQL Connection Pool
-const db = mysql.createPool({
-  host: DB_HOST,
-  user: DB_USER,
-  password: DB_PASSWORD,
-  database: DB_NAME,
-  port: Number(process.env.DB_PORT) || 3306   // <-- add this line
-});
+const db = mysql.createPool(process.env.MYSQL_PUBLIC_URL);
 
 
 console.log('✅  Connected to MySQL');

@@ -11,14 +11,15 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
+dotenv.config();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
 
-dotenv.config();
 
 
 // App
-const app  = express();
+const app = express();
 
 // ENV
 const {
@@ -27,22 +28,26 @@ const {
 } = process.env;
 
 
-
+// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
-// DB Connection
+// MySQL Connection Pool
 const db = mysql.createPool({
   host: DB_HOST,
   user: DB_USER,
   password: DB_PASSWORD,
-  database: DB_NAME
+  database: DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 });
+
 console.log('✅  Connected to MySQL');
 
-// Multer (upload design image)
+// Multer storage config
 const storage = multer.diskStorage({
   destination: path.join(__dirname, 'public', 'uploads'),
   filename: (_, file, cb) => cb(null, `design_${Date.now()}${path.extname(file.originalname)}`)
@@ -292,17 +297,25 @@ app.post('/api/fetch-shopify-orders', async (_, res) => {
   }
 });
 
-/* ── 6.  Simple demo login ─────────────────────────────────── */
+/* ── 6. Simple login ───────────── */
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
-  const [rows] = await db.execute(
-    'SELECT role FROM users WHERE username = ? AND password = ?',
-    [username, password]
-  );
-  if (!rows.length) return res.json({ success:false, message:'Invalid creds' });
 
-  res.json({ success:true, role:rows[0].role, username });
+  try {
+    const [rows] = await db.execute(
+      'SELECT role FROM users WHERE username = ? AND password = ?',
+      [username, password]
+    );
+    if (!rows.length) {
+      return res.json({ success:false, message:'Invalid credentials' });
+    }
+    res.json({ success:true, role:rows[0].role, username });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ success:false, message:'Server error' });
+  }
 });
+
 
 app.post('/api/quick-done', async (req, res) => {
   const { order_id, role } = req.body;

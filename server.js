@@ -35,19 +35,15 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
 // MySQL Connection Pool
-// Parse MYSQL_PUBLIC_URL from Railway variables
-const mysqlUrl = new URL(process.env.MYSQL_PUBLIC_URL);
-
 const connection = await mysql.createConnection({
-  host: mysqlUrl.hostname,               // mainline.proxy.rwly.net
-  user: mysqlUrl.username,               // root
-  password: mysqlUrl.password,           // pJFYIgdAzcrBdYOUoVpBTVQjDaLqrJYQ
-  database: mysqlUrl.pathname.slice(1), // remove leading slash if present
-  port: Number(mysqlUrl.port) || 3306,  // default to 3306 if port missing
+  host: process.env.MYSQL_HOST,
+  user: process.env.MYSQL_USER,
+  password: process.env.MYSQL_PASSWORD,
+  database: process.env.MYSQL_DATABASE,
+  port: Number(process.env.MYSQL_PORT) || 3306,
 });
 
-
-console.log('✅  Connected to MySQL');
+console.log('✅ Connected to MySQL');
 
 // Multer storage config
 const storage = multer.diskStorage({
@@ -58,19 +54,7 @@ const upload = multer({ storage });
 
 app.get('/export-json', async (req, res) => {
   try {
-    const connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      port: Number(process.env.DB_PORT),
-    });
-
-    // Only fetch all rows from "users" table for now
     const [rows] = await connection.query('SELECT * FROM users');
-
-    await connection.end();
-
     res.json({ users: rows });
   } catch (error) {
     console.error('Export error:', error);

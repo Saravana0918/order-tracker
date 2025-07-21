@@ -56,6 +56,34 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+app.get('/export-json', async (req, res) => {
+  try {
+    const connection = await mysql.createConnection({
+      host: process.env.MYSQL_HOST,
+      user: process.env.MYSQL_USER,
+      password: process.env.MYSQL_PASSWORD,
+      database: process.env.MYSQL_DATABASE,
+      port: Number(process.env.MYSQL_PORT) || 3306,
+    });
+
+    const [tables] = await connection.query("SHOW TABLES");
+    const tableNames = tables.map(row => Object.values(row)[0]);
+
+    const dbExport = {};
+
+    for (const table of tableNames) {
+      const [rows] = await connection.query(`SELECT * FROM \`${table}\``);
+      dbExport[table] = rows;
+    }
+
+    await connection.end();
+
+    res.json(dbExport);
+  } catch (error) {
+    console.error('Export error:', error);
+    res.status(500).send('Error exporting database');
+  }
+});
 
 /* -------- Upload Design + Notify -------- */
 app.post('/api/upload-design', upload.single('image'), async (req, res) => {

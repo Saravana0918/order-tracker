@@ -81,9 +81,10 @@ app.get('/export-json', async (req, res) => {
     res.json(dbExport);
   } catch (error) {
     console.error('Export error:', error);
-    res.status(500).send('Error exporting database');
+    res.status(500).send(`Error exporting database: ${error.message}`);
   }
 });
+
 
 /* -------- Upload Design + Notify -------- */
 app.post('/api/upload-design', upload.single('image'), async (req, res) => {

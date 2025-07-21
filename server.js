@@ -1,9 +1,9 @@
 /***************************
  * server.js (Customer-Specific Push)
  ***************************/
+import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 import express from 'express';
-import mysql from 'mysql2/promise';
 import cors from 'cors';
 import axios from 'axios';
 import multer from 'multer';
@@ -11,15 +11,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
 
-
+dotenv.config();
 
 // App
-const app = express();
+const app  = express();
 
 // ENV
 const {
@@ -28,37 +26,37 @@ const {
 } = process.env;
 
 
-// Middleware
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
-// MySQL Connection Pool
-const connection = await mysql.createConnection({
-  host: process.env.MYSQL_HOST,
-  user: process.env.MYSQL_USER,
-  password: process.env.MYSQL_PASSWORD,
-  database: process.env.MYSQL_DATABASE,
-  port: Number(process.env.MYSQL_PORT) || 3306,
+// DB Connection
+const pool = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT || 3306,
+  connectionLimit: 10
 });
+console.log('✅  Connected to MySQL');
 
-console.log('✅ Connected to MySQL');
-
-// Multer storage config
+// Multer (upload design image)
 const storage = multer.diskStorage({
   destination: path.join(__dirname, 'public', 'uploads'),
   filename: (_, file, cb) => cb(null, `design_${Date.now()}${path.extname(file.originalname)}`)
 });
 const upload = multer({ storage });
 
-app.get('/export-json', async (req, res) => {
+app.get('/api/test-db', async (req, res) => {
   try {
-    const [rows] = await connection.query('SELECT * FROM users');
-    res.json({ users: rows });
+    const [rows] = await pool.query('SELECT NOW() AS currentTime');
+    res.json({ success: true, message: 'Database connected!', time: rows[0].currentTime });
   } catch (error) {
-    console.error('Export error:', error);
-    res.status(500).send(`Error exporting database: ${error.message}`);
+    console.error('DB Test Error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -304,25 +302,17 @@ app.post('/api/fetch-shopify-orders', async (_, res) => {
   }
 });
 
-/* ── 6. Simple login ───────────── */
+/* ── 6.  Simple demo login ─────────────────────────────────── */
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
+  const [rows] = await db.execute(
+    'SELECT role FROM users WHERE username = ? AND password = ?',
+    [username, password]
+  );
+  if (!rows.length) return res.json({ success:false, message:'Invalid creds' });
 
-  try {
-    const [rows] = await db.execute(
-      'SELECT role FROM users WHERE username = ? AND password = ?',
-      [username, password]
-    );
-    if (!rows.length) {
-      return res.json({ success:false, message:'Invalid credentials' });
-    }
-    res.json({ success:true, role:rows[0].role, username });
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ success:false, message:'Server error' });
-  }
+  res.json({ success:true, role:rows[0].role, username });
 });
-
 
 app.post('/api/quick-done', async (req, res) => {
   const { order_id, role } = req.body;
@@ -397,12 +387,8 @@ app.post('/api/pending-summary', async (req, res) => {
 });
 
 /* ── 8.  Static login page ─────────────────────────────────── */
-app.get('/', (req, res) => {
+app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
-});
-
-app.get('/ping', (req, res) => {
-  res.send('pong');
 });
 
 /* ── 9.  Start server ──────────────────────────────────────── */

@@ -40,10 +40,9 @@ const db = mysql.createPool({
   user: DB_USER,
   password: DB_PASSWORD,
   database: DB_NAME,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
+  port: Number(process.env.DB_PORT) || 3306   // <-- add this line
 });
+
 
 console.log('✅  Connected to MySQL');
 

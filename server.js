@@ -12,19 +12,18 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = dirname(__filename);
+const __dirname = dirname(__filename);
 
 dotenv.config();
 
 // App
-const app  = express();
+const app = express();
 
 // ENV
 const {
-  DB_HOST, DB_USER, DB_PASSWORD, DB_NAME,
+  DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT,
   SHOPIFY_STORE, SHOPIFY_ADMIN_API_TOKEN
 } = process.env;
-
 
 
 app.use(cors());
@@ -32,16 +31,16 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
-// DB Connection
+// DB Connection Pool
 const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT || 3306,
+  host: DB_HOST,
+  user: DB_USER,
+  password: DB_PASSWORD,
+  database: DB_NAME,
+  port: DB_PORT || 3306,
   connectionLimit: 10
 });
-console.log('✅  Connected to MySQL');
+console.log('✅ Connected to MySQL');
 
 // Multer (upload design image)
 const storage = multer.diskStorage({
@@ -50,6 +49,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// Test DB Route
 app.get('/api/test-db', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT NOW() AS currentTime');
@@ -66,8 +66,7 @@ app.post('/api/upload-design', upload.single('image'), async (req, res) => {
     const { orderId } = req.body;
     const fileName = req.file.filename;
 
-    // Update the order with the uploaded design image
-    await db.execute(
+    await pool.execute(
       `UPDATE order_progress
          SET design_done = 1,
              design_image = ?,
@@ -76,7 +75,6 @@ app.post('/api/upload-design', upload.single('image'), async (req, res) => {
       [fileName, orderId]
     );
 
-    // Response after successful upload
     res.json({ success: true, file: fileName });
   } catch (err) {
     console.error('Upload error:', err);
@@ -86,7 +84,7 @@ app.post('/api/upload-design', upload.single('image'), async (req, res) => {
 
 
 
-/* ── 2.  Assign designer (customer role) ───────────────────── */
+/* -------- Assign designer -------- */
 app.post('/api/assign-designer', async (req, res) => {
   const { order_id, designer } = req.body;
 
@@ -94,8 +92,7 @@ app.post('/api/assign-designer', async (req, res) => {
     return res.status(400).json({ error: 'Missing order_id or designer' });
 
   try {
-    // ✅ Optional validation (ensure username exists in users table)
-    const [rows] = await db.execute(
+    const [rows] = await pool.execute(
       'SELECT id FROM users WHERE username = ? AND role = "design"',
       [designer]
     );
@@ -103,8 +100,7 @@ app.post('/api/assign-designer', async (req, res) => {
     if (!rows.length)
       return res.status(400).json({ error: 'Not a valid designer username' });
 
-    // ✅ Save username (not ID)
-    await db.execute(
+    await pool.execute(
       `UPDATE order_progress SET design_assignee = ?, updated_at = NOW() WHERE order_id = ?`,
       [designer, order_id]
     );
@@ -116,8 +112,7 @@ app.post('/api/assign-designer', async (req, res) => {
   }
 });
 
-
-/* -------- Mark Stage Done + Notify -------- */
+/* -------- Mark Stage Done -------- */
 app.post('/api/mark-stage-done', async (req, res) => {
   const { orderId, stage } = req.body;
   const allowedStages = ['design', 'printing', 'fusing', 'stitching', 'shipping'];
@@ -127,17 +122,11 @@ app.post('/api/mark-stage-done', async (req, res) => {
   }
 
   try {
-    await db.execute(
+    await pool.execute(
       `UPDATE order_progress SET ${stage}_done = 1, updated_at = NOW() WHERE order_id = ?`,
       [orderId]
     );
 
-    const capitalized = stage.charAt(0).toUpperCase() + stage.slice(1);
-
-    const [rows] = await db.query(
-      'SELECT customer_phone FROM order_progress WHERE order_id = ?',
-      [orderId]
-    );
     res.json({ success: true });
   } catch (err) {
     console.error('Stage-done error:', err);
@@ -146,14 +135,13 @@ app.post('/api/mark-stage-done', async (req, res) => {
 });
 
 
-/* ── 4.  Fetch + sync Shopify orders, then return list ─────── */
+/* -------- Fetch Orders -------- */
 app.get('/api/orders', async (req, res) => {
   const role = req.headers['x-user-role'];
   const user = req.headers['x-user-name'];
 
   try {
     if (role === 'admin' || role === 'customer') {
-      // Shopify sync + full load (keep as-is)
       const shopifyRes = await axios.get(`https://${SHOPIFY_STORE}/admin/api/2023-10/orders.json`, {
         headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_API_TOKEN },
         params: { status: 'any', limit: 50 }
@@ -162,60 +150,60 @@ app.get('/api/orders', async (req, res) => {
       const orders = shopifyRes.data.orders;
       for (const o of orders) {
         const orderId = o.id.toString();
-        const [exists] = await db.execute('SELECT 1 FROM order_progress WHERE order_id = ?', [orderId]);
-       const customerName = `${o.customer?.first_name || ''} ${o.customer?.last_name || ''}`.trim();
-const address = o.shipping_address
-  ? `${o.shipping_address.address1 || ''}, ${o.shipping_address.city || ''}, ${o.shipping_address.province || ''}, ${o.shipping_address.country || ''}, ${o.shipping_address.zip || ''}`
-  : '';
+        const [exists] = await pool.execute('SELECT 1 FROM order_progress WHERE order_id = ?', [orderId]);
 
-if (!exists.length) {
-  await db.execute(
-    `INSERT INTO order_progress (
-      order_id, order_name, customer_name,
-      total_price, fulfillment_status, payment_status,
-      shipping_method, item_count, tags, address, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-    [
-      orderId, o.name, customerName,
-      o.total_price || 0,
-      o.fulfillment_status || '',
-      o.financial_status || '',
-      o.shipping_lines?.[0]?.title || '',
-      o.line_items?.length || 0,
-      o.tags || '',
-      address
-    ]
-  );
-} else {
-  // 💥 This part updates old records with latest data
-  await db.execute(
-    `UPDATE order_progress SET
-      customer_name     = ?,
-      total_price       = ?,
-      fulfillment_status= ?,
-      payment_status    = ?,
-      shipping_method   = ?,
-      item_count        = ?,
-      tags              = ?,
-      address           = ?,
-      updated_at        = NOW()
-     WHERE order_id     = ?`,
-    [
-      customerName,
-      o.total_price || 0,
-      o.fulfillment_status || '',
-      o.financial_status || '',
-      o.shipping_lines?.[0]?.title || '',
-      o.line_items?.length || 0,
-      o.tags || '',
-      address,
-      orderId
-    ]
-  );
-}
+        const customerName = `${o.customer?.first_name || ''} ${o.customer?.last_name || ''}`.trim();
+        const address = o.shipping_address
+          ? `${o.shipping_address.address1 || ''}, ${o.shipping_address.city || ''}, ${o.shipping_address.province || ''}, ${o.shipping_address.country || ''}, ${o.shipping_address.zip || ''}`
+          : '';
+
+        if (!exists.length) {
+          await pool.execute(
+            `INSERT INTO order_progress (
+              order_id, order_name, customer_name,
+              total_price, fulfillment_status, payment_status,
+              shipping_method, item_count, tags, address, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+            [
+              orderId, o.name, customerName,
+              o.total_price || 0,
+              o.fulfillment_status || '',
+              o.financial_status || '',
+              o.shipping_lines?.[0]?.title || '',
+              o.line_items?.length || 0,
+              o.tags || '',
+              address
+            ]
+          );
+        } else {
+          await pool.execute(
+            `UPDATE order_progress SET
+              customer_name     = ?,
+              total_price       = ?,
+              fulfillment_status= ?,
+              payment_status    = ?,
+              shipping_method   = ?,
+              item_count        = ?,
+              tags              = ?,
+              address           = ?,
+              updated_at        = NOW()
+             WHERE order_id     = ?`,
+            [
+              customerName,
+              o.total_price || 0,
+              o.fulfillment_status || '',
+              o.financial_status || '',
+              o.shipping_lines?.[0]?.title || '',
+              o.line_items?.length || 0,
+              o.tags || '',
+              address,
+              orderId
+            ]
+          );
+        }
       }
 
-      const [rows] = await db.execute(`
+      const [rows] = await pool.execute(`
         SELECT
           order_id,
           order_name,
@@ -241,25 +229,25 @@ if (!exists.length) {
       return res.json({ orders: rows });
     }
 
-    // 🎯 Designer role — only show assigned orders not done
+    // Designer role
     let sql = 'SELECT * FROM order_progress WHERE 1=1';
     const params = [];
 
     if (role === 'design') {
-        sql += ' AND (design_done IS NULL OR design_done = 0) AND design_assignee = ?';
-        params.push(user);
-      } else if (role === 'printing') {
-        sql += ' AND design_done = 1 AND printing_done = 0';
-      } else if (role === 'fusing') {
-        sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 0';
-      } else if (role === 'stitching') {
-        sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 0';
-      } else if (role === 'shipping') {
-        sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0';
-      }
+      sql += ' AND (design_done IS NULL OR design_done = 0) AND design_assignee = ?';
+      params.push(user);
+    } else if (role === 'printing') {
+      sql += ' AND design_done = 1 AND printing_done = 0';
+    } else if (role === 'fusing') {
+      sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 0';
+    } else if (role === 'stitching') {
+      sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 0';
+    } else if (role === 'shipping') {
+      sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0';
+    }
 
     sql += ' ORDER BY updated_at DESC';
-    const [rows] = await db.execute(sql, params);
+    const [rows] = await pool.execute(sql, params);
     res.json({ orders: rows });
 
   } catch (err) {
@@ -302,16 +290,22 @@ app.post('/api/fetch-shopify-orders', async (_, res) => {
   }
 });
 
-/* ── 6.  Simple demo login ─────────────────────────────────── */
+/* -------- Login -------- */
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
-  const [rows] = await db.execute(
-    'SELECT role FROM users WHERE username = ? AND password = ?',
-    [username, password]
-  );
-  if (!rows.length) return res.json({ success:false, message:'Invalid creds' });
+  try {
+    const [rows] = await pool.execute(
+      'SELECT role FROM users WHERE username = ? AND password = ?',
+      [username, password]
+    );
 
-  res.json({ success:true, role:rows[0].role, username });
+    if (!rows.length) return res.json({ success: false, message: 'Invalid creds' });
+
+    res.json({ success: true, role: rows[0].role, username });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ success: false, error: 'Login failed' });
+  }
 });
 
 app.post('/api/quick-done', async (req, res) => {
@@ -386,12 +380,12 @@ app.post('/api/pending-summary', async (req, res) => {
   }
 });
 
-/* ── 8.  Static login page ─────────────────────────────────── */
+/* -------- Static login page -------- */
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-/* ── 9.  Start server ──────────────────────────────────────── */
+/* -------- Start server -------- */
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

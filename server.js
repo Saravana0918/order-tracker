@@ -56,32 +56,24 @@ const upload = multer({ storage });
 app.get('/export-json', async (req, res) => {
   try {
     const connection = await mysql.createConnection({
-      host: process.env.MYSQL_HOST,
-      user: process.env.MYSQL_USER,
-      password: process.env.MYSQL_PASSWORD,
-      database: process.env.MYSQL_DATABASE,
-      port: Number(process.env.MYSQL_PORT) || 3306,
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      port: Number(process.env.DB_PORT),
     });
 
-    const [tables] = await connection.query("SHOW TABLES");
-    const tableNames = tables.map(row => Object.values(row)[0]);
-
-    const dbExport = {};
-
-    for (const table of tableNames) {
-      const [rows] = await connection.query(`SELECT * FROM \`${table}\``);
-      dbExport[table] = rows;
-    }
+    // Only fetch all rows from "users" table for now
+    const [rows] = await connection.query('SELECT * FROM users');
 
     await connection.end();
 
-    res.json(dbExport);
+    res.json({ users: rows });
   } catch (error) {
     console.error('Export error:', error);
     res.status(500).send(`Error exporting database: ${error.message}`);
   }
 });
-
 
 /* -------- Upload Design + Notify -------- */
 app.post('/api/upload-design', upload.single('image'), async (req, res) => {
@@ -420,6 +412,10 @@ app.post('/api/pending-summary', async (req, res) => {
 /* ── 8.  Static login page ─────────────────────────────────── */
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.get('/ping', (req, res) => {
+  res.send('pong');
 });
 
 /* ── 9.  Start server ──────────────────────────────────────── */

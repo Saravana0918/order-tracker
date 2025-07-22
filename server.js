@@ -306,16 +306,16 @@ app.post('/api/pending-summary', async (req, res) => {
   if (!date) return res.status(400).json({ error: 'Date is required' });
 
   try {
-    const [rows] = await db.query(`
-      SELECT 
-        SUM(CASE WHEN design_done = 0 THEN 1 ELSE 0 END) AS design_pending,
-        SUM(CASE WHEN printing_done = 0 THEN 1 ELSE 0 END) AS printing_pending,
-        SUM(CASE WHEN fusing_done = 0 THEN 1 ELSE 0 END) AS fusing_pending,
-        SUM(CASE WHEN stitching_done = 0 THEN 1 ELSE 0 END) AS stitching_pending,
-        SUM(CASE WHEN shipping_done = 0 THEN 1 ELSE 0 END) AS shipping_pending
-      FROM order_progress
-      WHERE DATE(updated_at) = ?
-    `, [date]);
+    const [rows] = await pool.query(`
+    SELECT 
+      SUM(CASE WHEN design_done = 0 THEN 1 ELSE 0 END) AS design_pending,
+      SUM(CASE WHEN printing_done = 0 THEN 1 ELSE 0 END) AS printing_pending,
+      SUM(CASE WHEN fusing_done = 0 THEN 1 ELSE 0 END) AS fusing_pending,
+      SUM(CASE WHEN stitching_done = 0 THEN 1 ELSE 0 END) AS stitching_pending,
+      SUM(CASE WHEN shipping_done = 0 THEN 1 ELSE 0 END) AS shipping_pending
+    FROM order_progress
+    WHERE DATE(updated_at) = ?
+  `, [date]);
 
     const summary = rows[0];
     const total = Object.values(summary).reduce((sum, val) => sum + val, 0);

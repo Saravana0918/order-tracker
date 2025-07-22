@@ -297,7 +297,6 @@ function renderTable(){
           value = r.design_assignee ? `<span class="badge badge-assign">${r.design_assignee}</span>` : '-';
         }
       }
-
       else if(col==='design_preview'){
         value = r.design_image
           ? `<img src="/uploads/${r.design_image}" style="max-width:90px;border:1px solid #ccc;cursor:pointer"

@@ -157,9 +157,9 @@ async function loadWeeklySummary() {
     data.users.forEach(user => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${user.username}</td>
-        <td><a href="#" onclick="showUserOrders('${user.username}')">${user.count}</a></td>
-      `;
+      <td>${user.username}</td>
+      <td><a href="#" onclick="showUserOrders('${user.username}')">${user.count}</a></td>
+    `;
       tbody.appendChild(tr);
     });
   } catch (err) {
@@ -169,51 +169,43 @@ async function loadWeeklySummary() {
 
 
 async function showUserOrders(username) {
-  try {
-    const res = await fetch(`/api/user-orders/${username}`);
-    const data = await res.json();
+  const container = document.getElementById('userOrdersContainer');
+  container.innerHTML = `<p>Loading orders for <b>${username}</b>...</p>`;
 
-    if (!data.success || !data.orders.length) {
-      alert(`No orders found for ${username}`);
-      return;
-    }
+  const res = await fetch(`/api/user-orders/${username}`);
+  const data = await res.json();
 
-    // Build table dynamically
-    let tableHTML = `
-      <h5>Pending Orders for ${username}</h5>
-      <table class="table table-bordered">
-        <thead>
-          <tr>
-            <th>Order ID</th>
-            <th>Customer</th>
-            <th>Updated</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
-
-    data.orders.forEach(order => {
-      tableHTML += `
-        <tr>
-          <td>${order.order_name || order.order_id}</td>
-          <td>${order.customer_name || '-'}</td>
-          <td>${new Date(order.updated_at).toLocaleString()}</td>
-          <td>${order.design_done ? 'Done' : 'Pending'}</td>
-        </tr>
-      `;
-    });
-
-    tableHTML += `</tbody></table>`;
-
-    document.getElementById('userOrdersContainer').innerHTML = tableHTML;
-  } catch (err) {
-    console.error('Error fetching user orders:', err);
-    alert('Failed to load orders for user.');
+  if (data.orders.length === 0) {
+    container.innerHTML = `<p>No pending orders for <b>${username}</b>.</p>`;
+    return;
   }
+
+  // Build table
+  let table = `
+    <h5>Pending Orders for ${username}</h5>
+    <table class="table table-bordered table-hover">
+      <thead class="table-light">
+        <tr>
+          <th>Order ID</th>
+          <th>Customer</th>
+          <th>Updated At</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  data.orders.forEach(o => {
+    table += `
+      <tr>
+        <td>${o.order_name || o.order_id}</td>
+        <td>${o.customer_name}</td>
+        <td>${new Date(o.updated_at).toLocaleString()}</td>
+      </tr>`;
+  });
+
+  table += `</tbody></table>`;
+  container.innerHTML = table;
 }
-
-
 
 /* ───────────── Search filter ───────────── */
 function filterOrders(){

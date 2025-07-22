@@ -337,22 +337,30 @@ app.get('/api/weekly-summary', async (req, res) => {
   }
 });
 
+// Get pending orders for a specific user in last 7 days
 app.get('/api/user-orders/:username', async (req, res) => {
-  const { username } = req.params;
   try {
-    const [rows] = await pool.execute(
-      `SELECT * FROM order_progress
-       WHERE design_assignee = ? 
-       AND DATE(updated_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`,
-      [username]
+    const { username } = req.params;
+
+    const [orders] = await pool.query(
+      `SELECT order_id, order_name, customer_name, updated_at
+       FROM order_progress
+       WHERE (design_assignee = ? OR
+              (printing_done = 0 AND ? = 'printing_user') OR
+              (fusing_done = 0 AND ? = 'fusing_user') OR
+              (stitching_done = 0 AND ? = 'stitching_user') OR
+              (shipping_done = 0 AND ? = 'shipping_user'))
+         AND updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+       ORDER BY updated_at DESC`,
+      [username, username, username, username, username]
     );
-    res.json({ success: true, orders: rows });
+
+    res.json({ orders });
   } catch (err) {
-    console.error('Error fetching user orders:', err);
-    res.status(500).json({ success: false, error: 'Database query failed' });
+    console.error('User orders fetch error:', err);
+    res.status(500).json({ error: 'Database error' });
   }
 });
-
 
 app.post('/api/pending-summary', async (req, res) => {
   const { date } = req.body;

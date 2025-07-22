@@ -155,7 +155,7 @@ async function loadWeeklySummary() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${user.username}</td>
-      <td><a href="#" onclick="showUserOrders('${user.username}')">${user.orderCount}</a></td>
+      <td><a href="#" onclick="showUserOrders('${user.username}')">${user.count}</a></td>
     `;
     tbody.appendChild(tr);
   });

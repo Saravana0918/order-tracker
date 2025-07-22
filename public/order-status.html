@@ -241,23 +241,11 @@ function preview(id){
 async function uploadThenDone(orderId){
   const file = document.getElementById(`file-${orderId}`).files[0];
   if (!file) return alert('Choose file first.');
-
-  const formData = new FormData(); 
-  formData.append('designImage', file);  // Match server.js field name
-  formData.append('order_id', orderId);  // Match server.js variable
-
-  const res = await fetch('/api/upload-design', {
-    method:'POST',
-    body: formData
-  });
-
-  const d = await res.json();
-  if (d.success) { 
-    alert('Uploaded!'); 
-    await loadOrders(); 
-  } else alert('Upload failed');
+  const formData = new FormData(); formData.append('image',file); formData.append('orderId',orderId);
+  const res = await fetch('/api/upload-design',{method:'POST',body:formData});
+  const d   = await res.json();
+  if(d.success){ alert('Uploaded!'); await loadOrders(); } else alert('Upload failed');
 }
-
 
 /* ───────────── Quick done for later stages ───────────── */
 async function quickDone(orderId) {
@@ -390,8 +378,8 @@ function renderTable(){
       }
       else if(col==='design_preview'){
         value = r.design_image
-          ? `<img src="${r.design_image}" style="max-width:90px;border:1px solid #ccc;cursor:pointer"
-          title="Click to enlarge" onclick="window.open('${r.design_image}','_blank')" />`
+          ? `<img src="/uploads/${r.design_image}" style="max-width:90px;border:1px solid #ccc;cursor:pointer"
+                 title="Click to enlarge" onclick="window.open('/uploads/${r.design_image}','_blank')">`
           : '-';
       }
       else if(col==='updated') value = new Date(r.updated_at).toLocaleString();

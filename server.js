@@ -300,23 +300,37 @@ app.get('/api/get-order/:id', async (req, res) => {
   }
 });
 
-app.get('/api/user-weekly-summary', async (req, res) => {
+app.get('/api/weekly-summary', async (req, res) => {
   try {
-    const [rows] = await pool.query(`
-      SELECT 
-        design_assignee AS username, 
-        COUNT(*) AS total_orders
-      FROM order_progress
-      WHERE updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-        AND design_assignee IS NOT NULL
-      GROUP BY design_assignee
-    `);
-    res.json({ success: true, users: rows });
+    // Fetch all non-admin and non-customer users
+    const [users] = await pool.query(
+      `SELECT username FROM users WHERE role NOT IN ('admin', 'customer')`
+    );
+
+    const summary = [];
+
+    for (const user of users) {
+      const [orders] = await pool.query(
+        `SELECT COUNT(*) AS orderCount
+         FROM order_progress
+         WHERE design_assignee = ?
+           AND updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`,
+        [user.username]
+      );
+
+      summary.push({
+        username: user.username,
+        count: orders[0].orderCount || 0
+      });
+    }
+
+    res.json({ users: summary });
   } catch (err) {
     console.error('Weekly summary error:', err);
-    res.status(500).json({ success: false, error: 'Database error' });
+    res.status(500).json({ error: 'Database error' });
   }
 });
+
 
 app.get('/api/user-orders/:username', async (req, res) => {
   const { username } = req.params;

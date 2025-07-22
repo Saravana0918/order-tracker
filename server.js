@@ -73,22 +73,30 @@ app.get('/api/test-db', async (req, res) => {
 });
 
 // Route for uploading design preview image
-app.post('/api/upload-design', upload.single('designImage'), async (req, res) => {
+app.post('/api/upload-design', upload.single('image'), async (req, res) => {
   try {
+    console.log("File received:", req.file);
+    console.log("Body received:", req.body);
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
     const imageUrl = req.file.path;  // Cloudinary URL
-    const { order_id } = req.body;
+    const { orderId } = req.body;
 
     await pool.query(
       `UPDATE order_progress SET design_image = ?, updated_at = NOW() WHERE order_id = ?`,
-      [imageUrl, order_id]
+      [imageUrl, orderId]
     );
 
     res.json({ success: true, imageUrl });
   } catch (err) {
     console.error('Image upload error:', err);
-    res.status(500).json({ error: 'Failed to upload design image' });
+    res.status(500).json({ error: 'Failed to upload design image', details: err.message });
   }
 });
+
 
 /* -------- Assign designer -------- */
 app.post('/api/assign-designer', async (req, res) => {

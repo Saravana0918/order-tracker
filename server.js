@@ -6,8 +6,6 @@ import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
-import { upload } from './cloudinary.js';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -43,23 +41,12 @@ const pool = mysql.createPool({
 });
 console.log('✅ Connected to MySQL');
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+// Multer (upload design image)
+const storage = multer.diskStorage({
+  destination: path.join(__dirname, 'public', 'uploads'),
+  filename: (_, file, cb) => cb(null, `design_${Date.now()}${path.extname(file.originalname)}`)
 });
-
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'order-tracker',
-    allowed_formats: ['jpg', 'png', 'jpeg', 'webp']
-  },
-});
-
 const upload = multer({ storage });
-
-export { cloudinary, upload };
 
 // Test DB Route
 app.get('/api/test-db', async (req, res) => {
@@ -72,31 +59,27 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
-// Route for uploading design preview image
+/* -------- Upload Design + Notify -------- */
 app.post('/api/upload-design', upload.single('image'), async (req, res) => {
   try {
-    console.log('REQ FILE:', req.file);
-    console.log('REQ BODY:', req.body);
-
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    const imageUrl = req.file.path;  // Cloudinary URL
     const { orderId } = req.body;
+    const fileName = req.file.filename;
 
-    await pool.query(
-      `UPDATE order_progress SET design_image = ?, updated_at = NOW() WHERE order_id = ?`,
-      [imageUrl, orderId]
+    await pool.execute(
+      `UPDATE order_progress
+         SET design_done = 1,
+             design_image = ?,
+             updated_at = NOW()
+       WHERE order_id = ?`,
+      [fileName, orderId]
     );
 
-    res.json({ success: true, imageUrl });
+    res.json({ success: true, file: fileName });
   } catch (err) {
-    console.error('Image upload error:', err);
-    res.status(500).json({ error: 'Failed to upload design image', details: err.message });
+    console.error('Upload error:', err);
+    res.status(500).json({ success: false, error: 'Upload failed' });
   }
 });
-
 
 /* -------- Assign designer -------- */
 app.post('/api/assign-designer', async (req, res) => {
@@ -378,6 +361,7 @@ app.get('/api/user-orders/:username', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
+
 
 app.post('/api/pending-summary', async (req, res) => {
   const { date } = req.body;

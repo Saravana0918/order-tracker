@@ -13,7 +13,7 @@ const storage = new CloudinaryStorage({
   params: {
     folder: 'order-tracker',
     allowed_formats: ['jpg', 'png', 'jpeg', 'webp']
-  }
+  },
 });
 
 const upload = multer({ storage });

@@ -6,6 +6,8 @@ import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
+import { v2 as cloudinary } from 'cloudinary';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -41,7 +43,23 @@ const pool = mysql.createPool({
 });
 console.log('✅ Connected to MySQL');
 
-const { upload } = require('./cloudinary');
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'order-tracker',
+    allowed_formats: ['jpg', 'png', 'jpeg', 'webp']
+  },
+});
+
+const upload = multer({ storage });
+
+export { cloudinary, upload };
 
 // Test DB Route
 app.get('/api/test-db', async (req, res) => {

@@ -42,7 +42,7 @@
   <div id="summaryResult" style="margin-top: 10px; font-weight: bold;"></div>
 </div>
 
-<div class="card p-3 my-3">
+<div id="weeklyPerformanceCard" class="card p-3 my-3" style="display:none;">
   <h5>Weekly User Performance</h5>
   <table class="table table-bordered table-hover">
     <thead>
@@ -97,11 +97,18 @@ let filteredOrders = [];
 /* ───────────── Auth helpers ───────────── */
 function logout(){ localStorage.clear(); location.href = '/login'; }
 function checkLogin(){
-  userRole = localStorage.getItem('role') || 'admin';
+  userRole = localStorage.getItem('role') || '';
   username = localStorage.getItem('username') || '';
+
   if(!username) location.href = '/login';
   document.getElementById('loggedUser').innerText = `${username} (${userRole})`;
+
+  // Show weekly performance only for admin & customer
+  if (userRole === 'admin' || userRole === 'customer') {
+    document.getElementById('weeklyPerformanceCard').style.display = 'block';
+  }
 }
+
 
 /* ───────────── Column visibility ───────────── */
 function applyRoleVisibility(){
@@ -419,7 +426,10 @@ function renderTable(){
 window.onload = async () => {
   checkLogin();
   await loadOrders();
-  await loadWeeklySummary();
+
+  if (userRole === 'admin' || userRole === 'customer') {
+    await loadWeeklySummary();
+  }
 };
 </script>
 </body>

@@ -145,6 +145,7 @@ async function loadWeeklySummary() {
   const res = await fetch('/api/user-weekly-summary');
   const data = await res.json();
   if (!data.success) {
+    console.log(data.users);
     console.error('Failed to load weekly summary');
     return;
   }

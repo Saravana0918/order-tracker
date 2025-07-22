@@ -300,6 +300,24 @@ app.get('/api/get-order/:id', async (req, res) => {
   }
 });
 
+app.get('/api/user-weekly-summary', async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        design_assignee AS username, 
+        COUNT(*) AS total_orders
+      FROM order_progress
+      WHERE updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        AND design_assignee IS NOT NULL
+      GROUP BY design_assignee
+    `);
+    res.json({ success: true, users: rows });
+  } catch (err) {
+    console.error('Weekly summary error:', err);
+    res.status(500).json({ success: false, error: 'Database error' });
+  }
+});
+
 
 app.post('/api/pending-summary', async (req, res) => {
   const { date } = req.body;

@@ -42,6 +42,19 @@
   <div id="summaryResult" style="margin-top: 10px; font-weight: bold;"></div>
 </div>
 
+<div class="card p-3 my-3">
+  <h5>Weekly User Performance</h5>
+  <table class="table table-bordered table-hover">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Total Orders (Last 7 days)</th>
+      </tr>
+    </thead>
+    <tbody id="weeklySummaryTable"></tbody>
+  </table>
+</div>
+
   <!-- ORDER TABLE -->
   <div class="card p-3">
     <div class="table-responsive">
@@ -125,6 +138,33 @@ async function loadOrders() {
   }
 
   renderTable();
+}
+
+async function loadWeeklySummary() {
+  const res = await fetch('/api/user-weekly-summary');
+  const data = await res.json();
+  if (!data.success) {
+    console.error('Failed to load weekly summary');
+    return;
+  }
+
+  const tbody = document.getElementById('weeklySummaryTable');
+  tbody.innerHTML = '';
+  data.users.forEach(user => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${user.username}</td>
+      <td><a href="#" onclick="showUserOrders('${user.username}')">${user.total_orders}</a></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function showUserOrders(username) {
+  const res = await fetch(`/api/orders?user=${username}`);
+  const data = await res.json();
+  console.log(`Orders for ${username}:`, data.orders);
+  alert(`Orders for ${username} are shown in console!`);
 }
 
 
@@ -340,6 +380,7 @@ function renderTable(){
 window.onload = async () => {
   checkLogin();
   await loadOrders();
+  await loadWeeklySummary();
 };
 </script>
 </body>

@@ -78,9 +78,8 @@ app.post('/api/upload-design', upload.single('designImage'), async (req, res) =>
     const imageUrl = req.file.path;  // Cloudinary URL
     const { order_id } = req.body;
 
-    // Save the Cloudinary URL to the database
     await pool.query(
-      `UPDATE order_progress SET design_preview = ?, updated_at = NOW() WHERE order_id = ?`,
+      `UPDATE order_progress SET design_image = ?, updated_at = NOW() WHERE order_id = ?`,
       [imageUrl, order_id]
     );
 

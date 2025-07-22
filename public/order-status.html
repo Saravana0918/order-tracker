@@ -241,11 +241,23 @@ function preview(id){
 async function uploadThenDone(orderId){
   const file = document.getElementById(`file-${orderId}`).files[0];
   if (!file) return alert('Choose file first.');
-  const formData = new FormData(); formData.append('image',file); formData.append('orderId',orderId);
-  const res = await fetch('/api/upload-design',{method:'POST',body:formData});
-  const d   = await res.json();
-  if(d.success){ alert('Uploaded!'); await loadOrders(); } else alert('Upload failed');
+
+  const formData = new FormData(); 
+  formData.append('designImage', file);  // Match server.js field name
+  formData.append('order_id', orderId);  // Match server.js variable
+
+  const res = await fetch('/api/upload-design', {
+    method:'POST',
+    body: formData
+  });
+
+  const d = await res.json();
+  if (d.success) { 
+    alert('Uploaded!'); 
+    await loadOrders(); 
+  } else alert('Upload failed');
 }
+
 
 /* ───────────── Quick done for later stages ───────────── */
 async function quickDone(orderId) {

@@ -302,20 +302,26 @@ app.get('/api/get-order/:id', async (req, res) => {
 
 app.get('/api/weekly-summary', async (req, res) => {
   try {
-    // Fetch all non-admin and non-customer users
+    // Get all non-admin and non-customer users
     const [users] = await pool.query(
-      `SELECT username FROM users WHERE role NOT IN ('admin', 'customer')`
+      `SELECT username, role FROM users WHERE role NOT IN ('admin', 'customer')`
     );
 
     const summary = [];
 
     for (const user of users) {
+      let condition = '';
+      if (user.role === 'design') {
+        condition = `design_assignee = ?`;
+      } else {
+        // For printing/fusing/stitching/shipping, check who marked it as done
+        condition = `${user.role}_done = 1 AND updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`;
+      }
+
       const [orders] = await pool.query(
-        `SELECT COUNT(*) AS orderCount
-         FROM order_progress
-         WHERE design_assignee = ?
-           AND updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`,
-        [user.username]
+        `SELECT COUNT(*) AS orderCount FROM order_progress
+         WHERE ${condition}`,
+        user.role === 'design' ? [user.username] : []
       );
 
       summary.push({
@@ -330,7 +336,6 @@ app.get('/api/weekly-summary', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
-
 
 app.get('/api/user-orders/:username', async (req, res) => {
   const { username } = req.params;

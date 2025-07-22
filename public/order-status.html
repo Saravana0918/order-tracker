@@ -142,25 +142,31 @@ async function loadOrders() {
 }
 
 async function loadWeeklySummary() {
-  const res = await fetch('/api/user-weekly-summary');
-  const data = await res.json();
-  if (!data.success) {
-    console.log(data.users);
-    console.error('Failed to load weekly summary');
-    return;
-  }
+  try {
+    const res = await fetch('/api/weekly-summary');
+    const data = await res.json();
 
-  const tbody = document.getElementById('weeklySummaryTable');
-  tbody.innerHTML = '';
-  data.users.forEach(user => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${user.username}</td>
-      <td><a href="#" onclick="showUserOrders('${user.username}')">${user.count}</a></td>
-    `;
-    tbody.appendChild(tr);
-  });
+    if (!data || !data.users) {
+      console.error('No data received for weekly summary');
+      return;
+    }
+
+    const tbody = document.getElementById('weeklySummaryTable');
+    tbody.innerHTML = '';
+
+    data.users.forEach(user => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${user.username}</td>
+        <td><a href="#" onclick="showUserOrders('${user.username}')">${user.count}</a></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    console.error('Failed to load weekly summary', err);
+  }
 }
+
 
 async function showUserOrders(username) {
   try {

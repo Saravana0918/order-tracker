@@ -41,12 +41,7 @@ const pool = mysql.createPool({
 });
 console.log('✅ Connected to MySQL');
 
-// Multer (upload design image)
-const storage = multer.diskStorage({
-  destination: path.join(__dirname, 'public', 'uploads'),
-  filename: (_, file, cb) => cb(null, `design_${Date.now()}${path.extname(file.originalname)}`)
-});
-const upload = multer({ storage });
+const { upload } = require('./cloudinary');
 
 // Test DB Route
 app.get('/api/test-db', async (req, res) => {
@@ -59,25 +54,22 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
-/* -------- Upload Design + Notify -------- */
-app.post('/api/upload-design', upload.single('image'), async (req, res) => {
+// Route for uploading design preview image
+app.post('/api/upload-design', upload.single('designImage'), async (req, res) => {
   try {
-    const { orderId } = req.body;
-    const fileName = req.file.filename;
+    const imageUrl = req.file.path;  // Cloudinary URL
+    const { order_id } = req.body;
 
-    await pool.execute(
-      `UPDATE order_progress
-         SET design_done = 1,
-             design_image = ?,
-             updated_at = NOW()
-       WHERE order_id = ?`,
-      [fileName, orderId]
+    // Save the Cloudinary URL to the database
+    await pool.query(
+      `UPDATE order_progress SET design_preview = ?, updated_at = NOW() WHERE order_id = ?`,
+      [imageUrl, order_id]
     );
 
-    res.json({ success: true, file: fileName });
+    res.json({ success: true, imageUrl });
   } catch (err) {
-    console.error('Upload error:', err);
-    res.status(500).json({ success: false, error: 'Upload failed' });
+    console.error('Image upload error:', err);
+    res.status(500).json({ error: 'Failed to upload design image' });
   }
 });
 

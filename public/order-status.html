@@ -378,8 +378,8 @@ function renderTable(){
       }
       else if(col==='design_preview'){
         value = r.design_image
-          ? `<img src="/uploads/${r.design_image}" style="max-width:90px;border:1px solid #ccc;cursor:pointer"
-                 title="Click to enlarge" onclick="window.open('/uploads/${r.design_image}','_blank')">`
+          ? `<img src="${r.design_image}" style="max-width:90px;border:1px solid #ccc;cursor:pointer"
+          title="Click to enlarge" onclick="window.open('${r.design_image}','_blank')" />`
           : '-';
       }
       else if(col==='updated') value = new Date(r.updated_at).toLocaleString();

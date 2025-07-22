@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
-import { v2 as cloudinary } from 'cloudinary';
+import { upload } from './cloudinary.js';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import multer from 'multer';
 import path from 'path';
@@ -75,8 +75,8 @@ app.get('/api/test-db', async (req, res) => {
 // Route for uploading design preview image
 app.post('/api/upload-design', upload.single('image'), async (req, res) => {
   try {
-    console.log("File received:", req.file);
-    console.log("Body received:", req.body);
+    console.log('REQ FILE:', req.file);
+    console.log('REQ BODY:', req.body);
 
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });

@@ -318,6 +318,22 @@ app.get('/api/user-weekly-summary', async (req, res) => {
   }
 });
 
+app.get('/api/user-orders/:username', async (req, res) => {
+  const { username } = req.params;
+  try {
+    const [rows] = await pool.execute(
+      `SELECT * FROM order_progress
+       WHERE design_assignee = ? 
+       AND DATE(updated_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`,
+      [username]
+    );
+    res.json({ success: true, orders: rows });
+  } catch (err) {
+    console.error('Error fetching user orders:', err);
+    res.status(500).json({ success: false, error: 'Database query failed' });
+  }
+});
+
 
 app.post('/api/pending-summary', async (req, res) => {
   const { date } = req.body;

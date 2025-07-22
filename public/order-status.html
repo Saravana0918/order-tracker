@@ -278,21 +278,26 @@ function renderTable(){
       else if (stages.includes(col)) {
         value = getStatusBadge(r[col + '_done']);
       }
-      else if(col==='design_assignee'){
-        if(userRole==='customer' && !r.design_assignee){
-           value=`<div class="d-flex align-items-center gap-1">
-             <select class="form-select form-select-sm" data-order-id="${r.order_id}">
-               <option value="">Assign…</option>
-                <option value="srikanth">Srikanth</option>
-                <option value="kushi">Kushi</option>
-                <option value="shravanthi">Shravanthi</option>
-                <option value="mahesh">Mahesh</option>
-                <option value="pawan">Pawan</option>
-             </select>
-             <button class="btn btn-sm btn-primary" onclick="assignDesigner('${r.order_id}')">Assign</button>
-           </div>`;
-        } else value = r.design_assignee ? `<span class="badge badge-assign">${r.design_assignee}</span>` : '-';
+            else if(col==='design_assignee'){
+        if(userRole==='admin' || userRole==='customer'){
+          value=`<div class="d-flex align-items-center gap-1">
+            <select class="form-select form-select-sm" data-order-id="${r.order_id}">
+              <option value="">${r.design_assignee ? r.design_assignee : 'Assign…'}</option>
+              <option value="srikanth">Srikanth</option>
+              <option value="kushi">Kushi</option>
+              <option value="shravanthi">Shravanthi</option>
+              <option value="mahesh">Mahesh</option>
+              <option value="pawan">Pawan</option>
+            </select>
+            <button class="btn btn-sm btn-primary" onclick="assignDesigner('${r.order_id}')">
+              ${r.design_assignee ? 'Reassign' : 'Assign'}
+            </button>
+          </div>`;
+        } else {
+          value = r.design_assignee ? `<span class="badge badge-assign">${r.design_assignee}</span>` : '-';
+        }
       }
+
       else if(col==='design_preview'){
         value = r.design_image
           ? `<img src="/uploads/${r.design_image}" style="max-width:90px;border:1px solid #ccc;cursor:pointer"

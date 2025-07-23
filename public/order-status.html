@@ -200,23 +200,27 @@ async function showUserOrders(username) {
   const now = new Date();
 
   data.orders.forEach(o => {
-    const updatedDate = new Date(o.updated_at); // Raw DB date
-    const diffHours = (now.getTime() - updatedDate.getTime()) / (1000 * 60 * 60);
+    const updated = new Date(o.updated_at);
+    const diffHours = (now - updated) / (1000 * 60 * 60);
     const expiredClass = diffHours > 48 ? 'row-expired' : '';
+
+    // Use badge for status
+    const statusBadge = o.status === 'Done'
+      ? '<span class="badge bg-success">Done</span>'
+      : '<span class="badge bg-warning text-dark">Pending</span>';
 
     table += `
       <tr class="${expiredClass}">
         <td>${o.order_name || o.order_id}</td>
         <td>${o.customer_name}</td>
-        <td>${o.status || 'Pending'}</td>
-        <td>${updatedDate.toLocaleString()}</td>
+        <td>${statusBadge}</td>
+        <td>${updated.toLocaleString()}</td>
       </tr>`;
   });
 
   table += `</tbody></table>`;
   container.innerHTML = table;
 }
-
 
 /* ───────────── Search filter ───────────── */
 function filterOrders(){

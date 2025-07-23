@@ -167,7 +167,13 @@ async function loadWeeklySummary() {
 }
 
 function parseDateString(dateStr) {
-  // Convert '7/17/2025, 8:14:53 PM' into a Date object
+  if (!dateStr) return new Date(0); // Return a very old date if null/undefined
+
+  if (!dateStr.includes(',')) {
+    // If it's already a valid ISO format or timestamp, just parse it
+    return new Date(dateStr);
+  }
+
   const parts = dateStr.split(', ');
   const dateParts = parts[0].split('/');
   const timeParts = parts[1].split(':');
@@ -181,6 +187,7 @@ function parseDateString(dateStr) {
 
   return new Date(dateParts[2], dateParts[0] - 1, dateParts[1], hours, minutes, seconds);
 }
+
 
 function isOlderThan48Hours(dateStr) {
   const updatedDate = parseDateString(dateStr);

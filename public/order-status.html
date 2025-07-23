@@ -43,16 +43,8 @@
 </div>
 
 <div id="weeklyPerformanceCard" class="card p-3 my-3" style="display:none;">
-  <h5>Weekly User Performance</h5>
-  <table class="table table-bordered table-hover">
-    <thead>
-      <tr>
-        <th>User</th>
-        <th>Total Orders (Last 7 days)</th>
-      </tr>
-    </thead>
-    <tbody id="weeklySummaryTable"></tbody>
-  </table>
+  <h5>Users</h5>
+  <div id="userButtons" class="d-flex flex-wrap gap-2"></div>
 </div>
 <div id="userOrdersContainer" class="mt-4"></div>
 
@@ -158,16 +150,15 @@ async function loadWeeklySummary() {
       return;
     }
 
-    const tbody = document.getElementById('weeklySummaryTable');
-    tbody.innerHTML = '';
+    const container = document.getElementById('userButtons');
+    container.innerHTML = '';
 
     data.users.forEach(user => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-      <td>${user.username}</td>
-      <td><a href="#" onclick="showUserOrders('${user.username}')">${user.count}</a></td>
-    `;
-      tbody.appendChild(tr);
+      const btn = document.createElement('button');
+      btn.className = "btn btn-outline-primary btn-sm";
+      btn.innerText = `${user.username} (${user.count})`;
+      btn.onclick = () => showUserOrders(user.username);
+      container.appendChild(btn);
     });
   } catch (err) {
     console.error('Failed to load weekly summary', err);
@@ -182,19 +173,19 @@ async function showUserOrders(username) {
   const res = await fetch(`/api/user-orders/${username}`);
   const data = await res.json();
 
-  if (data.orders.length === 0) {
-    container.innerHTML = `<p>No pending orders for <b>${username}</b>.</p>`;
+  if (!data.orders || data.orders.length === 0) {
+    container.innerHTML = `<p>No orders found for <b>${username}</b>.</p>`;
     return;
   }
 
-  // Build table
   let table = `
-    <h5>Pending Orders for ${username}</h5>
+    <h5>Orders for ${username}</h5>
     <table class="table table-bordered table-hover">
       <thead class="table-light">
         <tr>
           <th>Order ID</th>
           <th>Customer</th>
+          <th>Status</th>
           <th>Updated At</th>
         </tr>
       </thead>
@@ -202,10 +193,12 @@ async function showUserOrders(username) {
   `;
 
   data.orders.forEach(o => {
+    const status = o.design_done ? "Done" : "Pending";
     table += `
       <tr>
         <td>${o.order_name || o.order_id}</td>
         <td>${o.customer_name}</td>
+        <td>${status}</td>
         <td>${new Date(o.updated_at).toLocaleString()}</td>
       </tr>`;
   });
@@ -213,6 +206,7 @@ async function showUserOrders(username) {
   table += `</tbody></table>`;
   container.innerHTML = table;
 }
+
 
 /* ───────────── Search filter ───────────── */
 function filterOrders(){

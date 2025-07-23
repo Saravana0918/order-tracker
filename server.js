@@ -314,8 +314,8 @@ app.get('/api/weekly-summary', async (req, res) => {
       if (user.role === 'design') {
         condition = `design_assignee = ?`;
       } else {
-        // For printing/fusing/stitching/shipping, check who marked it as done
-        condition = `${user.role}_done = 1 AND updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`;
+        // For printing/fusing/stitching/shipping, check who marked it as done (all time)
+        condition = `${user.role}_done = 1`;
       }
 
       const [orders] = await pool.query(
@@ -336,6 +336,7 @@ app.get('/api/weekly-summary', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
+
 
 // Get pending orders for a specific user in last 7 days
 app.get('/api/user-orders/:username', async (req, res) => {

@@ -302,6 +302,7 @@ app.get('/api/get-order/:id', async (req, res) => {
 
 app.get('/api/weekly-summary', async (req, res) => {
   try {
+    // Fetch all non-admin and non-customer users
     const [users] = await pool.query(
       `SELECT username, role FROM users WHERE role NOT IN ('admin', 'customer')`
     );
@@ -309,22 +310,27 @@ app.get('/api/weekly-summary', async (req, res) => {
     const summary = [];
 
     for (const user of users) {
-      let condition = '';
+      let query = '';
       let params = [];
 
       if (user.role === 'design') {
-        condition = `design_assignee = ?`;
+        query = `SELECT COUNT(*) AS orderCount FROM order_progress WHERE design_assignee = ?`;
         params = [user.username];
-      } else if (['printing_user', 'fusing_user', 'stitching_user', 'shipping_user'].includes(user.role)) {
-        condition = `${user.role.split('_')[0]}_done = 0`; // Count all pending tasks for this role
+      } 
+      else if (user.role === 'printing') {
+        query = `SELECT COUNT(*) AS orderCount FROM order_progress WHERE printing_done = 0`;
+      } 
+      else if (user.role === 'fusing') {
+        query = `SELECT COUNT(*) AS orderCount FROM order_progress WHERE fusing_done = 0`;
+      } 
+      else if (user.role === 'stitching') {
+        query = `SELECT COUNT(*) AS orderCount FROM order_progress WHERE stitching_done = 0`;
+      } 
+      else if (user.role === 'shipping') {
+        query = `SELECT COUNT(*) AS orderCount FROM order_progress WHERE shipping_done = 0`;
       }
 
-      if (!condition) continue; // Skip if no valid role condition
-
-      const [orders] = await pool.query(
-        `SELECT COUNT(*) AS orderCount FROM order_progress WHERE ${condition}`,
-        params
-      );
+      const [orders] = await pool.query(query, params);
 
       summary.push({
         username: user.username,
@@ -338,6 +344,7 @@ app.get('/api/weekly-summary', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
+
 
 // Get pending orders for a specific user in last 7 days
 app.get('/api/user-orders/:username', async (req, res) => {

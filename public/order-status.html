@@ -15,6 +15,7 @@
     .search-bar input{ border-radius:50px;padding-left:35px; }
     .card           { border:none;border-radius:12px;box-shadow:0 0 15px rgba(0,0,0,.05); }
     .btn-add        { border-radius:50px; }
+    .row-expired { background-color: #f8d7da !important; }
   </style>
 </head>
 <body class="p-4">
@@ -173,41 +174,44 @@ async function showUserOrders(username) {
   const res = await fetch(`/api/user-orders/${username}`);
   const data = await res.json();
 
-  if (!data.orders || data.orders.length === 0) {
-    container.innerHTML = `<p>No orders found for <b>${username}</b>.</p>`;
+  if (data.orders.length === 0) {
+    container.innerHTML = `<p>No pending orders for <b>${username}</b>.</p>`;
     return;
   }
 
+  // Build table
   let table = `
-  <h5>Orders for ${username}</h5>
-  <table class="table table-bordered table-hover">
-    <thead class="table-light">
-      <tr>
-        <th>Order ID</th>
-        <th>Customer</th>
-        <th>Status</th>
-        <th>Updated At</th>
-      </tr>
-    </thead>
-    <tbody>
-`;
+    <h5>Orders for ${username}</h5>
+    <table class="table table-bordered table-hover">
+      <thead class="table-light">
+        <tr>
+          <th>Order ID</th>
+          <th>Customer</th>
+          <th>Status</th>
+          <th>Updated At</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
 
-data.orders.forEach(o => {
-  table += `
-    <tr>
-      <td>${o.order_name || o.order_id}</td>
-      <td>${o.customer_name}</td>
-      <td>${o.status === 'Done' 
-        ? '<span class="badge bg-success">Done</span>' 
-        : '<span class="badge bg-warning text-dark">Pending</span>'}</td>
-      <td>${new Date(o.updated_at).toLocaleString()}</td>
-    </tr>`;
-});
+  const now = new Date();
+  data.orders.forEach(o => {
+    const updated = new Date(o.updated_at);
+    const diffHours = (now - updated) / (1000 * 60 * 60); 
+    const rowClass = diffHours > 48 ? 'row-expired' : ''; 
+
+    table += `
+      <tr class="${rowClass}">
+        <td>${o.order_name || o.order_id}</td>
+        <td>${o.customer_name}</td>
+        <td>${o.status || 'Pending'}</td>
+        <td>${updated.toLocaleString()}</td>
+      </tr>`;
+  });
 
   table += `</tbody></table>`;
   container.innerHTML = table;
 }
-
 
 /* ───────────── Search filter ───────────── */
 function filterOrders(){

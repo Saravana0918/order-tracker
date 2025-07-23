@@ -16,7 +16,7 @@
     .card           { border:none;border-radius:12px;box-shadow:0 0 15px rgba(0,0,0,.05); }
     .btn-add        { border-radius:50px; }
     table.table-hover tbody tr.row-expired td {background-color: #f8d7da !important; color: #721c24 !important;}
-    #homeBtn { border-radius: 50px; padding: 10px 15px; font-weight: bold;}
+    #homeBtn { position: fixed;bottom: 20px;right: 20px;z-index: 999;border-radius: 50px;padding: 10px 20px; display: none; }
   </style>
 </head>
 <body class="p-4">
@@ -38,11 +38,7 @@
            placeholder="Search Order ID…" onkeyup="filterOrders()">
   </div>
 
-  <button id="homeBtn" onclick="scrollToTop()" 
-    class="btn btn-primary" 
-    style="position: fixed; bottom: 20px; right: 20px; display: none; z-index: 1000;">
-    Home
-  </button>
+  <button id="homeBtn" class="btn btn-primary">Home</button>
 
   <div id="summaryBox" style="display: none; margin-bottom: 20px;">
     <label><strong>Select Date:</strong></label>
@@ -95,19 +91,19 @@ let userRole='', username='';
 let allOrders = [];
 let filteredOrders = [];
 
-// Scroll to top function
-function scrollToTop() {
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-// Show/hide button based on scroll
+// Show button when user scrolls down
 window.addEventListener('scroll', () => {
   const btn = document.getElementById('homeBtn');
-  if (window.scrollY > 300) {  // Show button after scrolling 300px
+  if (window.scrollY > 200) { // Show after scrolling 200px
     btn.style.display = 'block';
   } else {
     btn.style.display = 'none';
   }
+});
+
+// Scroll back to top when clicked
+document.getElementById('homeBtn').addEventListener('click', () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
 

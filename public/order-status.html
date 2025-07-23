@@ -16,6 +16,7 @@
     .card           { border:none;border-radius:12px;box-shadow:0 0 15px rgba(0,0,0,.05); }
     .btn-add        { border-radius:50px; }
     table.table-hover tbody tr.row-expired td {background-color: #f8d7da !important; color: #721c24 !important;}
+    #homeBtn { border-radius: 50px; padding: 10px 15px; font-weight: bold;}
   </style>
 </head>
 <body class="p-4">
@@ -29,13 +30,19 @@
       <button class="btn btn-sm btn-danger ms-2" onclick="logout()">Logout</button>
     </div>
   </div>  
-
+  
   <!-- Search bar + order count -->
   <div class="d-flex justify-content-between align-items-center my-3">
     <h5 id="orderCountText" class="mb-0"></h5>
     <input type="text" id="searchInput" class="form-control w-25"
            placeholder="Search Order ID…" onkeyup="filterOrders()">
   </div>
+
+  <button id="homeBtn" onclick="scrollToTop()" 
+    class="btn btn-primary" 
+    style="position: fixed; bottom: 20px; right: 20px; display: none; z-index: 1000;">
+    Home
+  </button>
 
   <div id="summaryBox" style="display: none; margin-bottom: 20px;">
     <label><strong>Select Date:</strong></label>
@@ -87,6 +94,22 @@ const roleCols = {
 let userRole='', username='';
 let allOrders = [];
 let filteredOrders = [];
+
+// Scroll to top function
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Show/hide button based on scroll
+window.addEventListener('scroll', () => {
+  const btn = document.getElementById('homeBtn');
+  if (window.scrollY > 300) {  // Show button after scrolling 300px
+    btn.style.display = 'block';
+  } else {
+    btn.style.display = 'none';
+  }
+});
+
 
 /* ───────────── Auth helpers ───────────── */
 function logout(){ localStorage.clear(); location.href = '/login'; }

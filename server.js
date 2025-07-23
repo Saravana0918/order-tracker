@@ -302,7 +302,6 @@ app.get('/api/get-order/:id', async (req, res) => {
 
 app.get('/api/weekly-summary', async (req, res) => {
   try {
-    // Get all non-admin and non-customer users
     const [users] = await pool.query(
       `SELECT username, role FROM users WHERE role NOT IN ('admin', 'customer')`
     );
@@ -310,23 +309,22 @@ app.get('/api/weekly-summary', async (req, res) => {
     const summary = [];
 
     for (const user of users) {
-      let query = '';
+      let condition = '';
       let params = [];
 
       if (user.role === 'design') {
-        query = `SELECT COUNT(*) AS orderCount FROM order_progress WHERE design_assignee = ?`;
+        condition = `design_assignee = ?`;
         params = [user.username];
-      } else if (user.role === 'printing_user') {
-        query = `SELECT COUNT(*) AS orderCount FROM order_progress`; // all orders
-      } else if (user.role === 'fusing_user') {
-        query = `SELECT COUNT(*) AS orderCount FROM order_progress`;
-      } else if (user.role === 'stitching_user') {
-        query = `SELECT COUNT(*) AS orderCount FROM order_progress`;
-      } else if (user.role === 'shipping_user') {
-        query = `SELECT COUNT(*) AS orderCount FROM order_progress`;
+      } else if (['printing_user', 'fusing_user', 'stitching_user', 'shipping_user'].includes(user.role)) {
+        condition = `${user.role.split('_')[0]}_done = 0`; // Count all pending tasks for this role
       }
 
-      const [orders] = await pool.query(query, params);
+      if (!condition) continue; // Skip if no valid role condition
+
+      const [orders] = await pool.query(
+        `SELECT COUNT(*) AS orderCount FROM order_progress WHERE ${condition}`,
+        params
+      );
 
       summary.push({
         username: user.username,
@@ -340,7 +338,6 @@ app.get('/api/weekly-summary', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
-
 
 // Get pending orders for a specific user in last 7 days
 app.get('/api/user-orders/:username', async (req, res) => {

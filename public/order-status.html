@@ -93,21 +93,10 @@ let userRole='', username='';
 let allOrders = [];
 let filteredOrders = [];
 
-// Show Home button when scrolling
-window.addEventListener('scroll', () => {
-  const btn = document.getElementById('homeButton');
-  if (window.scrollY > 200) {
-    btn.style.display = 'block';
-  } else {
-    btn.style.display = 'none';
-  }
-});
-
-// Scroll to the main table when clicking Home
 document.getElementById('homeButton').addEventListener('click', () => {
-  const mainTable = document.querySelector('.card p-3'); // Main order table container
-  if (mainTable) {
-    mainTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const tableCard = document.querySelector('.card.p-3');
+  if (tableCard) {
+    tableCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 });
 

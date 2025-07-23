@@ -38,7 +38,9 @@
            placeholder="Search Order ID…" onkeyup="filterOrders()">
   </div>
 
-  <button class="btn btn-primary" id="homeButton" onclick="scrollToMainTable()">Home</button>
+      <button class="btn btn-primary" id="homeButton" style="position: fixed; bottom: 20px; right: 20px; display: none;">
+      Home
+    </button>
 
   <div id="summaryBox" style="display: none; margin-bottom: 20px;">
     <label><strong>Select Date:</strong></label>
@@ -91,27 +93,32 @@ let userRole='', username='';
 let allOrders = [];
 let filteredOrders = [];
 
-// Show button when user scrolls down
+// Show Home button when scrolling
 window.addEventListener('scroll', () => {
-  const btn = document.getElementById('homeBtn');
-  if (window.scrollY > 200) { // Show after scrolling 200px
+  const btn = document.getElementById('homeButton');
+  if (window.scrollY > 200) {
     btn.style.display = 'block';
   } else {
     btn.style.display = 'none';
   }
 });
 
-// Scroll back to top when clicked
-document.getElementById('homeBtn').addEventListener('click', () => {
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+// Scroll to the main table when clicking Home
+document.getElementById('homeButton').addEventListener('click', () => {
+  // First try userOrdersContainer (for printing_user)
+  const userOrders = document.getElementById('userOrdersContainer');
+
+  if (userOrders && userOrders.innerHTML.trim() !== '') {
+    userOrders.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else {
+    // Fallback to main table
+    const mainTable = document.querySelector('.card.p-3');
+    if (mainTable) {
+      mainTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
 });
 
-function scrollToMainTable() {
-  const mainTable = document.querySelector('.card.p-3'); // Select the main order table container
-  if (mainTable) {
-    mainTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-}
 
 /* ───────────── Auth helpers ───────────── */
 function logout(){ localStorage.clear(); location.href = '/login'; }

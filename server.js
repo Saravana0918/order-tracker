@@ -310,19 +310,23 @@ app.get('/api/weekly-summary', async (req, res) => {
     const summary = [];
 
     for (const user of users) {
-      let condition = '';
+      let query = '';
+      let params = [];
+
       if (user.role === 'design') {
-        condition = `design_assignee = ?`;
-      } else {
-        // For printing/fusing/stitching/shipping, check who marked it as done (all time)
-        condition = `${user.role}_done = 1`;
+        query = `SELECT COUNT(*) AS orderCount FROM order_progress WHERE design_assignee = ?`;
+        params = [user.username];
+      } else if (user.role === 'printing_user') {
+        query = `SELECT COUNT(*) AS orderCount FROM order_progress`; // all orders
+      } else if (user.role === 'fusing_user') {
+        query = `SELECT COUNT(*) AS orderCount FROM order_progress`;
+      } else if (user.role === 'stitching_user') {
+        query = `SELECT COUNT(*) AS orderCount FROM order_progress`;
+      } else if (user.role === 'shipping_user') {
+        query = `SELECT COUNT(*) AS orderCount FROM order_progress`;
       }
 
-      const [orders] = await pool.query(
-        `SELECT COUNT(*) AS orderCount FROM order_progress
-         WHERE ${condition}`,
-        user.role === 'design' ? [user.username] : []
-      );
+      const [orders] = await pool.query(query, params);
 
       summary.push({
         username: user.username,

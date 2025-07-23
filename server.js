@@ -343,25 +343,45 @@ app.get('/api/user-orders/:username', async (req, res) => {
   try {
     const { username } = req.params;
 
-    const [orders] = await pool.query(
-      `SELECT order_id, order_name, customer_name, updated_at
-       FROM order_progress
-       WHERE (design_assignee = ? OR
-              (printing_done = 0 AND ? = 'printing_user') OR
-              (fusing_done = 0 AND ? = 'fusing_user') OR
-              (stitching_done = 0 AND ? = 'stitching_user') OR
-              (shipping_done = 0 AND ? = 'shipping_user'))
-         AND updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-       ORDER BY updated_at DESC`,
-      [username, username, username, username, username]
+    const [roleData] = await pool.query(
+      `SELECT role FROM users WHERE username = ?`,
+      [username]
     );
 
+    if (!roleData.length) return res.json({ orders: [] });
+
+    const role = roleData[0].role;
+
+    let query = '';
+    let params = [];
+
+    if (role === 'design') {
+      query = `
+        SELECT order_id, order_name, customer_name, 
+               IF(design_done = 1, 'Done', 'Pending') AS status,
+               updated_at
+        FROM order_progress
+        WHERE design_assignee = ?
+        ORDER BY updated_at DESC`;
+      params = [username];
+    } else {
+      query = `
+        SELECT order_id, order_name, customer_name, 
+               IF(${role}_done = 1, 'Done', 'Pending') AS status,
+               updated_at
+        FROM order_progress
+        ORDER BY updated_at DESC`;
+      params = [];
+    }
+
+    const [orders] = await pool.query(query, params);
     res.json({ orders });
   } catch (err) {
     console.error('User orders fetch error:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });
+
 
 
 app.post('/api/pending-summary', async (req, res) => {

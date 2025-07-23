@@ -179,29 +179,30 @@ async function showUserOrders(username) {
   }
 
   let table = `
-    <h5>Orders for ${username}</h5>
-    <table class="table table-bordered table-hover">
-      <thead class="table-light">
-        <tr>
-          <th>Order ID</th>
-          <th>Customer</th>
-          <th>Status</th>
-          <th>Updated At</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
-
-  data.orders.forEach(o => {
-    const status = o.design_done ? "Done" : "Pending";
-    table += `
+  <h5>Orders for ${username}</h5>
+  <table class="table table-bordered table-hover">
+    <thead class="table-light">
       <tr>
-        <td>${o.order_name || o.order_id}</td>
-        <td>${o.customer_name}</td>
-        <td>${status}</td>
-        <td>${new Date(o.updated_at).toLocaleString()}</td>
-      </tr>`;
-  });
+        <th>Order ID</th>
+        <th>Customer</th>
+        <th>Status</th>
+        <th>Updated At</th>
+      </tr>
+    </thead>
+    <tbody>
+`;
+
+data.orders.forEach(o => {
+  table += `
+    <tr>
+      <td>${o.order_name || o.order_id}</td>
+      <td>${o.customer_name}</td>
+      <td>${o.status === 'Done' 
+        ? '<span class="badge bg-success">Done</span>' 
+        : '<span class="badge bg-warning text-dark">Pending</span>'}</td>
+      <td>${new Date(o.updated_at).toLocaleString()}</td>
+    </tr>`;
+});
 
   table += `</tbody></table>`;
   container.innerHTML = table;

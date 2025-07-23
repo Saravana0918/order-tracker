@@ -167,10 +167,10 @@ async function loadWeeklySummary() {
 }
 
 function parseDateString(dateStr) {
-  if (!dateStr) return new Date(0); // Return a very old date if null/undefined
+  if (!dateStr) return new Date(0); // If null, set an old date
 
+  // If the date is already in a standard format (e.g., ISO), return directly
   if (!dateStr.includes(',')) {
-    // If it's already a valid ISO format or timestamp, just parse it
     return new Date(dateStr);
   }
 
@@ -187,7 +187,6 @@ function parseDateString(dateStr) {
 
   return new Date(dateParts[2], dateParts[0] - 1, dateParts[1], hours, minutes, seconds);
 }
-
 
 function isOlderThan48Hours(dateStr) {
   const updatedDate = parseDateString(dateStr);
@@ -226,21 +225,23 @@ async function showUserOrders(username) {
 
   const now = new Date();
   data.orders.forEach(o => {
-    const updatedStr = o.updated_at;
-    const rowClass = isOlderThan48Hours(updatedStr) ? 'row-expired' : '';
+    const updated = parseDateString(o.updated_at);
+    const diffHours = (now - updated) / (1000 * 60 * 60); 
+    const rowClass = diffHours > 48 ? 'row-expired' : ''; 
 
     table += `
       <tr class="${rowClass}">
         <td>${o.order_name || o.order_id}</td>
         <td>${o.customer_name}</td>
         <td>${o.status || 'Pending'}</td>
-        <td>${parseDateString(updatedStr).toLocaleString()}</td>
+        <td>${updated.toLocaleString()}</td>
       </tr>`;
   });
 
   table += `</tbody></table>`;
   container.innerHTML = table;
 }
+
 
 /* ───────────── Search filter ───────────── */
 function filterOrders(){
@@ -369,32 +370,42 @@ async function syncOrders() {
 }
 
 /* ───────────── Render table ───────────── */
-function renderTable(){
+function renderTable() {
   const tbody = document.getElementById('ordersTable');
   const thead = document.getElementById('theadRow');
-  tbody.innerHTML = ''; thead.innerHTML = '';
+  tbody.innerHTML = ''; 
+  thead.innerHTML = '';
 
   const visible = roleCols[userRole] || allCols;
+  const now = new Date();
 
-  visible.forEach(col=>{
-    const th=document.createElement('th');
-    th.setAttribute('data-column',col);
-    th.innerText = col.replace(/_/g,' ').replace('-',' ').toUpperCase();
+  visible.forEach(col => {
+    const th = document.createElement('th');
+    th.setAttribute('data-column', col);
+    th.innerText = col.replace(/_/g, ' ').replace('-', ' ').toUpperCase();
     thead.appendChild(th);
   });
 
-  filteredOrders.forEach(r=>{
-    const tr=document.createElement('tr'); let html='';
-    visible.forEach(col=>{
-      let value='-';
-      if(col==='order-id')      value = r.order_name || r.order_id;
-      else if(col==='customer') value = r.customer_name || '-';
+  filteredOrders.forEach(r => {
+    const tr = document.createElement('tr'); 
+    let html = '';
+
+    // Calculate 48-hour difference for row highlight
+    const updatedDate = parseDateString(r.updated_at);
+    const diffHours = (now - updatedDate) / (1000 * 60 * 60);
+    if (diffHours > 48) {
+      tr.classList.add('row-expired');
+    }
+
+    visible.forEach(col => {
+      let value = '-';
+      if (col === 'order-id') value = r.order_name || r.order_id;
+      else if (col === 'customer') value = r.customer_name || '-';
       else if (stages.includes(col)) {
         value = getStatusBadge(r[col + '_done']);
-      }
-            else if(col==='design_assignee'){
-        if(userRole==='admin' || userRole==='customer'){
-          value=`<div class="d-flex align-items-center gap-1">
+      } else if (col === 'design_assignee') {
+        if (userRole === 'admin' || userRole === 'customer') {
+          value = `<div class="d-flex align-items-center gap-1">
             <select class="form-select form-select-sm" data-order-id="${r.order_id}">
               <option value="">${r.design_assignee ? r.design_assignee : 'Assign…'}</option>
               <option value="srikanth">Srikanth</option>
@@ -410,19 +421,15 @@ function renderTable(){
         } else {
           value = r.design_assignee ? `<span class="badge badge-assign">${r.design_assignee}</span>` : '-';
         }
-      }
-      else if(col==='design_preview'){
+      } else if (col === 'design_preview') {
         value = r.design_image
           ? `<img src="/uploads/${r.design_image}" style="max-width:90px;border:1px solid #ccc;cursor:pointer"
                  title="Click to enlarge" onclick="window.open('/uploads/${r.design_image}','_blank')">`
           : '-';
-      }
-      else if(col==='updated') {
-        value = parseDateString(r.updated_at).toLocaleString();
-      }
-      else if(col==='actions'){
-        if(userRole.startsWith('design') && !r.design_done && r.design_assignee===username){
-          value=`<div class="d-flex flex-column gap-1">
+      } else if (col === 'updated') value = updatedDate.toLocaleString();
+      else if (col === 'actions') {
+        if (userRole.startsWith('design') && !r.design_done && r.design_assignee === username) {
+          value = `<div class="d-flex flex-column gap-1">
               <input type="file" id="file-${r.order_id}" class="form-control form-control-sm"
                      accept="image/*" onchange="preview('${r.order_id}')">
               <img id="thumb-${r.order_id}" style="max-width:90px;display:none;border:1px solid #ccc">
@@ -430,13 +437,13 @@ function renderTable(){
                 Upload & Done
               </button>
             </div>`;
-        } else if(
-          (userRole==='printing'  && !r.printing_done) ||
-          (userRole==='fusing'    && !r.fusing_done)   ||
-          (userRole==='stitching' && !r.stitching_done)||
-          (userRole==='shipping'  && !r.shipping_done)
-        ){
-          value=`<button class="btn btn-sm btn-success" onclick="quickDone('${r.order_id}')">
+        } else if (
+          (userRole === 'printing' && !r.printing_done) ||
+          (userRole === 'fusing' && !r.fusing_done) ||
+          (userRole === 'stitching' && !r.stitching_done) ||
+          (userRole === 'shipping' && !r.shipping_done)
+        ) {
+          value = `<button class="btn btn-sm btn-success" onclick="quickDone('${r.order_id}')">
                    Mark as Done
                  </button>`;
         }

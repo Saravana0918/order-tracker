@@ -38,7 +38,7 @@
            placeholder="Search Order ID…" onkeyup="filterOrders()">
   </div>
 
-  <button id="homeBtn" class="btn btn-primary">Home</button>
+  <button class="btn btn-primary" id="homeButton" onclick="scrollToMainTable()">Home</button>
 
   <div id="summaryBox" style="display: none; margin-bottom: 20px;">
     <label><strong>Select Date:</strong></label>
@@ -106,6 +106,12 @@ document.getElementById('homeBtn').addEventListener('click', () => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
+function scrollToMainTable() {
+  const mainTable = document.querySelector('.card.p-3'); // Select the main order table container
+  if (mainTable) {
+    mainTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
 
 /* ───────────── Auth helpers ───────────── */
 function logout(){ localStorage.clear(); location.href = '/login'; }

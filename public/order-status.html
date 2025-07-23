@@ -105,7 +105,7 @@ window.addEventListener('scroll', () => {
 
 // Scroll to the main table when clicking Home
 document.getElementById('homeButton').addEventListener('click', () => {
-  const mainTable = document.querySelector('.card.p-3'); // Main order table container
+  const mainTable = document.querySelector('.card p-3'); // Main order table container
   if (mainTable) {
     mainTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }

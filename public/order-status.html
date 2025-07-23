@@ -105,20 +105,11 @@ window.addEventListener('scroll', () => {
 
 // Scroll to the main table when clicking Home
 document.getElementById('homeButton').addEventListener('click', () => {
-  // First try userOrdersContainer (for printing_user)
-  const userOrders = document.getElementById('userOrdersContainer');
-
-  if (userOrders && userOrders.innerHTML.trim() !== '') {
-    userOrders.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  } else {
-    // Fallback to main table
-    const mainTable = document.querySelector('.card.p-3');
-    if (mainTable) {
-      mainTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+  const mainTable = document.querySelector('.card.p-3'); // Main order table container
+  if (mainTable) {
+    mainTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 });
-
 
 /* ───────────── Auth helpers ───────────── */
 function logout(){ localStorage.clear(); location.href = '/login'; }

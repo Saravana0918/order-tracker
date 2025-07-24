@@ -314,7 +314,9 @@ app.get('/api/weekly-summary', async (req, res) => {
       let params = [];
 
       if (user.role === 'design') {
-        query = `SELECT COUNT(*) AS orderCount FROM order_progress WHERE design_assignee = ?`;
+        query = `SELECT COUNT(*) AS orderCount 
+                 FROM order_progress 
+                 WHERE design_assignee = ? AND design_done = 0`;
         params = [user.username];
       } 
       else if (user.role === 'printing') {

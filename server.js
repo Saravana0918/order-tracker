@@ -347,6 +347,56 @@ app.get('/api/weekly-summary', async (req, res) => {
   }
 });
 
+// ---------------- WEEKLY SUMMARY TABLE ----------------
+app.get('/api/weekly-summary-table', async (req, res) => {
+  try {
+    const today = new Date();
+    const results = [];
+
+    // Last 7 days loop
+    for (let i = 0; i < 7; i++) {
+      const date = new Date();
+      date.setDate(today.getDate() - i);
+      const formattedDate = date.toISOString().split('T')[0]; // yyyy-mm-dd
+
+      // Prepare counts for each user
+      const [designers] = await pool.query(
+        `SELECT username FROM users WHERE role='design'`
+      );
+
+      const dayData = { date: formattedDate };
+
+      // Count pending for each designer
+      for (const designer of designers) {
+        const [rows] = await pool.query(
+          `SELECT COUNT(*) AS cnt FROM order_progress
+           WHERE design_assignee = ? AND design_done = 0 
+           AND DATE(updated_at) <= ?`,
+          [designer.username, formattedDate]
+        );
+        dayData[designer.username] = rows[0].cnt;
+      }
+
+      // Printing, Fusing, Stitching, Shipping
+      const stages = ['printing', 'fusing', 'stitching', 'shipping'];
+      for (const stage of stages) {
+        const [rows] = await pool.query(
+          `SELECT COUNT(*) AS cnt FROM order_progress
+           WHERE ${stage}_done = 0 AND DATE(updated_at) <= ?`,
+          [formattedDate]
+        );
+        dayData[`${stage}_user`] = rows[0].cnt;
+      }
+
+      results.push(dayData);
+    }
+
+    res.json(results.reverse()); // oldest first
+  } catch (err) {
+    console.error('Error fetching weekly summary:', err);
+    res.status(500).json({ error: 'DB Error' });
+  }
+});
 
 // Get pending orders for a specific user in last 7 days
 app.get('/api/user-orders/:username', async (req, res) => {

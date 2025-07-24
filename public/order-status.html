@@ -53,6 +53,16 @@
   </div>
   <div id="userOrdersContainer" class="mt-4"></div>
 
+  <h4 class="mt-4">Weekly Pending Summary (Last 7 Days)</h4>
+<div id="weekly-summary-container" class="table-responsive">
+  <table class="table table-bordered text-center" id="weekly-summary-table">
+    <thead>
+      <tr id="weekly-summary-header"></tr>
+    </thead>
+    <tbody id="weekly-summary-body"></tbody>
+  </table>
+</div>
+
   <!-- ORDER TABLE -->
   <div class="card p-3" id="mainTableSection">
   <div class="table-responsive">
@@ -190,6 +200,38 @@ async function loadWeeklySummary() {
     console.error('Failed to load weekly summary', err);
   }
 }
+
+// ------------------- Weekly Pending Table Loader -------------------
+document.addEventListener('DOMContentLoaded', async function () {
+  try {
+    const res = await fetch('/api/weekly-summary-table'); // new endpoint
+    const data = await res.json();
+
+    if (!data.length) return;
+
+    const headerRow = document.getElementById('weekly-summary-header');
+    const body = document.getElementById('weekly-summary-body');
+
+    // Clear previous table data
+    headerRow.innerHTML = '';
+    body.innerHTML = '';
+
+    // Get all columns from first row keys
+    const keys = Object.keys(data[0]); // e.g., ["date", "srikanth", "kushi", ...]
+    headerRow.innerHTML = `<th>Date</th>` + keys.slice(1).map(k => `<th>${k}</th>`).join('');
+
+    // Fill rows
+    data.forEach(row => {
+      let rowHTML = `<td>${row.date}</td>`;
+      keys.slice(1).forEach(k => {
+        rowHTML += `<td>${row[k]}</td>`;
+      });
+      body.innerHTML += `<tr>${rowHTML}</tr>`;
+    });
+  } catch (err) {
+    console.error('Error loading weekly pending table:', err);
+  }
+});
 
 /* ───────────── Show User Orders ───────────── */
 async function showUserOrders(username) {

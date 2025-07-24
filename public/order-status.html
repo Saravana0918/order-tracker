@@ -473,7 +473,7 @@ function renderTable(){
       }
       else if(col==='design_preview'){
         value = r.design_image
-          ? `<img src="/uploads/${r.design_image}" style="max-width:90px;border:1px solid #ccc;cursor:pointer"
+          ? `<img src="/uploads/design/${r.design_image}" style="max-width:90px;border:1px solid #ccc;cursor:pointer"
                  title="Click to enlarge" onclick="window.open('/uploads/${r.design_image}','_blank')">`
           : '-';
       }

@@ -378,13 +378,6 @@ app.get('/api/weekly-summary', async (req, res) => {
 // ---------------- WEEKLY SUMMARY TABLE ----------------
 app.get('/api/weekly-summary-table', async (req, res) => {
   try {
-    const role = req.headers['x-user-role'];
-
-    // Only admin and customer can view this summary
-    if (role !== 'admin' && role !== 'customer') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
     const today = new Date();
     const results = [];
 

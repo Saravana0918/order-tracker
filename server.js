@@ -137,7 +137,7 @@ app.get('/api/orders', async (req, res) => {
   const user = req.headers['x-user-name'];
 
   try {
-    let sql = `
+        let sql = `
       SELECT
         order_id,
         order_name,
@@ -158,23 +158,26 @@ app.get('/api/orders', async (req, res) => {
         design_image,
         design_assignee
       FROM order_progress
+      WHERE DATE(created_at) = CURDATE()
     `;
+
     const params = [];
 
     if (role === 'design') {
-      sql += ' WHERE (design_done IS NULL OR design_done = 0) AND design_assignee = ?';
+      sql += ' AND (design_done IS NULL OR design_done = 0) AND design_assignee = ?';
       params.push(user);
     } else if (role === 'printing') {
-      sql += ' WHERE design_done = 1 AND printing_done = 0';
+      sql += ' AND design_done = 1 AND printing_done = 0';
     } else if (role === 'fusing') {
-      sql += ' WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 0';
+      sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 0';
     } else if (role === 'stitching') {
-      sql += ' WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 0';
+      sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 0';
     } else if (role === 'shipping') {
-      sql += ' WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0';
+      sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0';
     }
 
     sql += ' ORDER BY updated_at DESC';
+
     const [rows] = await pool.execute(sql, params);
     res.json({ orders: rows });
   } catch (err) {
@@ -182,6 +185,7 @@ app.get('/api/orders', async (req, res) => {
     res.status(500).json({ error: 'Failed to load orders' });
   }
 });
+
 
 /* -------- Sync Shopify Orders (Manual Refresh) -------- */
 app.post('/api/sync-orders', async (req, res) => {
@@ -195,7 +199,14 @@ app.post('/api/sync-orders', async (req, res) => {
     );
 
     let imported = 0;
+    const todayDate = new Date().toISOString().split('T')[0]; // yyyy-mm-dd
+
     for (const o of shopifyRes.data.orders) {
+      const orderDate = new Date(o.created_at).toISOString().split('T')[0];
+
+      // Skip orders not created today
+      if (orderDate !== todayDate) continue;
+
       const orderId = o.id.toString();
       const [exists] = await pool.execute(
         'SELECT 1 FROM order_progress WHERE order_id = ?',
@@ -212,8 +223,8 @@ app.post('/api/sync-orders', async (req, res) => {
           `INSERT INTO order_progress (
             order_id, order_name, customer_name,
             total_price, fulfillment_status, payment_status,
-            shipping_method, item_count, tags, address, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+            shipping_method, item_count, tags, address, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
           [
             orderId, o.name, customerName,
             o.total_price || 0,
@@ -222,7 +233,8 @@ app.post('/api/sync-orders', async (req, res) => {
             o.shipping_lines?.[0]?.title || '',
             o.line_items?.length || 0,
             o.tags || '',
-            address
+            address,
+            new Date(o.created_at) 
           ]
         );
         imported++;

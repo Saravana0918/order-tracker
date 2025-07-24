@@ -28,7 +28,7 @@ const {
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
+app.use('/uploads', express.static('/uploads'));
 
 // DB Connection Pool
 const pool = mysql.createPool({
@@ -43,7 +43,7 @@ console.log('✅ Connected to MySQL');
 
 // Multer (upload design image)
 const storage = multer.diskStorage({
-  destination: path.join(__dirname, 'public', 'uploads'),
+  destination: '/uploads/design',
   filename: (_, file, cb) => cb(null, `design_${Date.now()}${path.extname(file.originalname)}`)
 });
 const upload = multer({ storage });

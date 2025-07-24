@@ -189,24 +189,28 @@ app.get('/api/orders', async (req, res) => {
 /* -------- Sync Shopify Orders (Manual Refresh) -------- */
 app.post('/api/sync-orders', async (req, res) => {
   try {
+    // Start of today (midnight)
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    // Fetch today's orders directly from Shopify
     const shopifyRes = await axios.get(
       `https://${SHOPIFY_STORE}/admin/api/2023-10/orders.json`,
       {
         headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_API_TOKEN },
-        params: { status: 'any', limit: 50 }
+        params: {
+          status: 'any',
+          created_at_min: startOfDay.toISOString(), // only orders created today
+          limit: 100
+        }
       }
     );
 
     let imported = 0;
-    const todayDate = new Date().toISOString().split('T')[0]; // yyyy-mm-dd
-
     for (const o of shopifyRes.data.orders) {
-      const orderDate = new Date(o.created_at).toISOString().split('T')[0];
-
-      // Skip orders not created today
-      if (orderDate !== todayDate) continue;
-
       const orderId = o.id.toString();
+
+      // Check if already exists
       const [exists] = await pool.execute(
         'SELECT 1 FROM order_progress WHERE order_id = ?',
         [orderId]
@@ -223,7 +227,7 @@ app.post('/api/sync-orders', async (req, res) => {
             order_id, order_name, customer_name,
             total_price, fulfillment_status, payment_status,
             shipping_method, item_count, tags, address, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
           [
             orderId, o.name, customerName,
             o.total_price || 0,
@@ -232,8 +236,7 @@ app.post('/api/sync-orders', async (req, res) => {
             o.shipping_lines?.[0]?.title || '',
             o.line_items?.length || 0,
             o.tags || '',
-            address,
-            new Date(o.created_at) 
+            address
           ]
         );
         imported++;

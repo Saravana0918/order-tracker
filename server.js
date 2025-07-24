@@ -137,7 +137,7 @@ app.get('/api/orders', async (req, res) => {
   const user = req.headers['x-user-name'];
 
   try {
-        let sql = `
+    let sql = `
       SELECT
         order_id,
         order_name,
@@ -177,7 +177,6 @@ app.get('/api/orders', async (req, res) => {
     }
 
     sql += ' ORDER BY updated_at DESC';
-
     const [rows] = await pool.execute(sql, params);
     res.json({ orders: rows });
   } catch (err) {

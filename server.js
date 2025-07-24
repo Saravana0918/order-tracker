@@ -328,22 +328,35 @@ app.get('/api/weekly-summary', async (req, res) => {
       let params = [];
 
       if (user.role === 'design') {
-        query = `SELECT COUNT(*) AS orderCount 
-                 FROM order_progress 
-                 WHERE design_assignee = ? AND design_done = 0`;
+        query = `
+          SELECT COUNT(*) AS orderCount 
+          FROM order_progress 
+          WHERE design_assignee = ? AND design_done = 0`;
         params = [user.username];
       } 
       else if (user.role === 'printing') {
-        query = `SELECT COUNT(*) AS orderCount FROM order_progress WHERE printing_done = 0`;
+        query = `
+          SELECT COUNT(*) AS orderCount 
+          FROM order_progress 
+          WHERE design_done = 1 AND printing_done = 0`;
       } 
       else if (user.role === 'fusing') {
-        query = `SELECT COUNT(*) AS orderCount FROM order_progress WHERE fusing_done = 0`;
+        query = `
+          SELECT COUNT(*) AS orderCount 
+          FROM order_progress 
+          WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 0`;
       } 
       else if (user.role === 'stitching') {
-        query = `SELECT COUNT(*) AS orderCount FROM order_progress WHERE stitching_done = 0`;
+        query = `
+          SELECT COUNT(*) AS orderCount 
+          FROM order_progress 
+          WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 0`;
       } 
       else if (user.role === 'shipping') {
-        query = `SELECT COUNT(*) AS orderCount FROM order_progress WHERE shipping_done = 0`;
+        query = `
+          SELECT COUNT(*) AS orderCount 
+          FROM order_progress 
+          WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0`;
       }
 
       const [orders] = await pool.query(query, params);
@@ -360,6 +373,7 @@ app.get('/api/weekly-summary', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
+
 
 // ---------------- WEEKLY SUMMARY TABLE ----------------
 app.get('/api/weekly-summary-table', async (req, res) => {
@@ -390,16 +404,22 @@ app.get('/api/weekly-summary-table', async (req, res) => {
         dayData[designer.username] = rows[0].cnt;
       }
 
-      // Count only pending for each stage
-      const stages = ['printing', 'fusing', 'stitching', 'shipping'];
+      // Stage-wise pending counts
+      const stages = [
+        { name: 'printing', condition: 'design_done = 1 AND printing_done = 0' },
+        { name: 'fusing', condition: 'design_done = 1 AND printing_done = 1 AND fusing_done = 0' },
+        { name: 'stitching', condition: 'design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 0' },
+        { name: 'shipping', condition: 'design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0' }
+      ];
+
       for (const stage of stages) {
         const [rows] = await pool.query(
           `SELECT COUNT(*) AS cnt FROM order_progress
-           WHERE ${stage}_done = 0 
+           WHERE ${stage.condition}
            AND DATE(updated_at) <= ?`,
           [formattedDate]
         );
-        dayData[`${stage}_user`] = rows[0].cnt;
+        dayData[`${stage.name}_user`] = rows[0].cnt;
       }
 
       results.push(dayData);

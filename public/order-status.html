@@ -53,7 +53,11 @@
   </div>
   <div id="userOrdersContainer" class="mt-4"></div>
 
-  <h4 class="mt-4">Weekly Pending Summary (Last 7 Days)</h4>
+<h4 class="mt-4 d-flex align-items-center justify-content-between">
+  Weekly Pending Summary (Last 7 Days)
+  <button class="btn btn-secondary btn-sm mb-2" onclick="loadWeeklyPendingTable()">Refresh</button>
+</h4>
+
 <div id="weekly-summary-container" class="table-responsive">
   <table class="table table-bordered text-center" id="weekly-summary-table">
     <thead>
@@ -62,6 +66,7 @@
     <tbody id="weekly-summary-body"></tbody>
   </table>
 </div>
+
 
   <!-- ORDER TABLE -->
   <div class="card p-3" id="mainTableSection">
@@ -202,7 +207,7 @@ async function loadWeeklySummary() {
 }
 
 // ------------------- Weekly Pending Table Loader -------------------
-document.addEventListener('DOMContentLoaded', async function () {
+async function loadWeeklyPendingTable() {
   try {
     const res = await fetch('/api/weekly-summary-table'); // new endpoint
     const data = await res.json();
@@ -231,7 +236,11 @@ document.addEventListener('DOMContentLoaded', async function () {
   } catch (err) {
     console.error('Error loading weekly pending table:', err);
   }
-});
+}
+
+// Load on page load
+document.addEventListener('DOMContentLoaded', loadWeeklyPendingTable);
+
 
 /* ───────────── Show User Orders ───────────── */
 async function showUserOrders(username) {

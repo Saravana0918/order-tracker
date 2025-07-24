@@ -209,13 +209,7 @@ async function loadWeeklySummary() {
 // ------------------- Weekly Pending Table Loader -------------------
 async function loadWeeklyPendingTable() {
   try {
-     const userRole = localStorage.getItem('userRole') || 'customer'; 
-    // (Replace with your actual logic to get the logged-in user's role)
-
-    const res = await fetch('/api/weekly-summary-table', {
-      headers: { 'x-user-role': userRole }  // Send user role
-    });
-
+    const res = await fetch('/api/weekly-summary-table'); // new endpoint
     const data = await res.json();
 
     if (!data.length) return;
@@ -246,6 +240,7 @@ async function loadWeeklyPendingTable() {
 
 // Load on page load
 document.addEventListener('DOMContentLoaded', loadWeeklyPendingTable);
+
 
 /* ───────────── Show User Orders ───────────── */
 async function showUserOrders(username) {

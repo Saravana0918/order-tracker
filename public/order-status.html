@@ -53,20 +53,18 @@
   </div>
   <div id="userOrdersContainer" class="mt-4"></div>
 
-<div class="weekly-summary-section">
-  <h4 class="mt-4 d-flex align-items-center justify-content-between">
-    Weekly Pending Summary (Last 7 Days)
-    <button class="btn btn-secondary btn-sm mb-2" onclick="loadWeeklyPendingTable()">Refresh</button>
-  </h4>
+<h4 class="mt-4 d-flex align-items-center justify-content-between">
+  Weekly Pending Summary (Last 7 Days)
+  <button class="btn btn-secondary btn-sm mb-2" onclick="loadWeeklyPendingTable()">Refresh</button>
+</h4>
 
-  <div id="weekly-summary-container" class="table-responsive">
-    <table class="table table-bordered text-center" id="weekly-summary-table">
-      <thead>
-        <tr id="weekly-summary-header"></tr>
-      </thead>
-      <tbody id="weekly-summary-body"></tbody>
-    </table>
-  </div>
+<div id="weekly-summary-container" class="table-responsive">
+  <table class="table table-bordered text-center" id="weekly-summary-table">
+    <thead>
+      <tr id="weekly-summary-header"></tr>
+    </thead>
+    <tbody id="weekly-summary-body"></tbody>
+  </table>
 </div>
 
 
@@ -142,25 +140,6 @@ function checkLogin(){
   }
 }
 
-function checkWeeklySummaryVisibility() {
-  const role = localStorage.getItem('role');
-  const weeklySummarySection = document.querySelector('.weekly-summary-section');
-  
-  if (role !== 'admin' && role !== 'customer') {
-    if (weeklySummarySection) {
-      weeklySummarySection.style.display = 'none';
-    }
-  }
-}
-window.onload = async () => {
-  checkLogin();
-  checkWeeklySummaryVisibility();
-  await loadOrders();
-  if (userRole === 'admin' || userRole === 'customer') {
-    await loadWeeklySummary();
-  }
-};
-
 function parseDateString(dateStr) {
   return new Date(dateStr); // Works if dateStr is in valid SQL datetime format
 }
@@ -231,7 +210,8 @@ async function loadWeeklySummary() {
 async function loadWeeklyPendingTable() {
   try {
      const userRole = localStorage.getItem('userRole') || 'customer'; 
- 
+    // (Replace with your actual logic to get the logged-in user's role)
+
     const res = await fetch('/api/weekly-summary-table', {
       headers: { 'x-user-role': userRole }  // Send user role
     });

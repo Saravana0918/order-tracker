@@ -196,8 +196,8 @@
   }
 
   async function login() {
-    const username = document.getElementById("username").value.trim();
-    const password = document.getElementById("password").value.trim();
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
 
     const res = await fetch('/api/login', {
       method: 'POST',
@@ -207,18 +207,15 @@
 
     const data = await res.json();
     if (data.success) {
-      // ✅ Store role and username in localStorage
+      // ✅ Use sessionStorage
       localStorage.setItem('username', data.username); 
-      localStorage.setItem('userRole', data.role); // Use 'userRole' consistently
-
-      // Redirect to dashboard
+      localStorage.setItem('role', data.role);
       window.location.href = 'order-status.html';
     } else {
-      document.getElementById('error').innerText = data.message || 'Invalid login details';
+      document.getElementById('error').innerText = data.message;
     }
   }
 </script>
-
 
 
 </body>

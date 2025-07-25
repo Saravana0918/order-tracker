@@ -228,12 +228,14 @@ app.post('/api/sync-orders', async (req, res) => {
         : '';
 
       if (!exists.length) {
+        const shopifyCreatedAt = new Date(o.created_at); 
+
         await pool.execute(
           `INSERT INTO order_progress (
             order_id, order_name, customer_name,
             total_price, fulfillment_status, payment_status,
             shipping_method, item_count, tags, address, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             orderId, o.name, customerName,
             o.total_price || 0,
@@ -243,7 +245,8 @@ app.post('/api/sync-orders', async (req, res) => {
             o.line_items?.length || 0,
             o.tags || '',
             address,
-            new Date(o.created_at)
+            shopifyCreatedAt,
+            shopifyCreatedAt 
           ]
         );
         imported++;

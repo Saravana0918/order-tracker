@@ -316,7 +316,6 @@ app.get('/api/get-order/:id', async (req, res) => {
 
 app.get('/api/weekly-summary', async (req, res) => {
   try {
-    // Fetch all non-admin and non-customer users
     const [users] = await pool.query(
       `SELECT username, role FROM users WHERE role NOT IN ('admin', 'customer')`
     );
@@ -329,33 +328,33 @@ app.get('/api/weekly-summary', async (req, res) => {
 
       if (user.role === 'design') {
         query = `
-          SELECT COUNT(*) AS orderCount 
-          FROM order_progress 
+          SELECT COUNT(*) AS orderCount
+          FROM order_progress
           WHERE design_assignee = ? AND design_done = 0
         `;
         params = [user.username];
       } else if (user.role === 'printing') {
         query = `
-          SELECT COUNT(*) AS orderCount 
-          FROM order_progress 
+          SELECT COUNT(*) AS orderCount
+          FROM order_progress
           WHERE design_done = 1 AND printing_done = 0
         `;
       } else if (user.role === 'fusing') {
         query = `
-          SELECT COUNT(*) AS orderCount 
-          FROM order_progress 
+          SELECT COUNT(*) AS orderCount
+          FROM order_progress
           WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 0
         `;
       } else if (user.role === 'stitching') {
         query = `
-          SELECT COUNT(*) AS orderCount 
-          FROM order_progress 
+          SELECT COUNT(*) AS orderCount
+          FROM order_progress
           WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 0
         `;
       } else if (user.role === 'shipping') {
         query = `
-          SELECT COUNT(*) AS orderCount 
-          FROM order_progress 
+          SELECT COUNT(*) AS orderCount
+          FROM order_progress
           WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0
         `;
       }
@@ -370,6 +369,7 @@ app.get('/api/weekly-summary', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
+
 
 
 // ---------------- WEEKLY SUMMARY TABLE ----------------

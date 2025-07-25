@@ -406,19 +406,20 @@ app.get('/api/weekly-summary-table', async (req, res) => {
 
       const dayData = { date: formattedDate };
 
-      // Count only pending for each designer
+      // Designer-wise pending (created on this date)
       for (const designer of designers) {
         const [rows] = await pool.query(
-          `SELECT COUNT(*) AS cnt FROM order_progress
-            WHERE design_assignee = ? 
-            AND design_done = 0 
-            AND DATE(created_at) = ?`,
+          `SELECT COUNT(*) AS cnt
+           FROM order_progress
+           WHERE design_assignee = ?
+           AND design_done = 0
+           AND DATE(created_at) = ?`,
           [designer.username, formattedDate]
         );
-        dayData[designer.username] = rows[0].cnt;
+        dayData[designer.username] = rows[0].cnt || 0;
       }
 
-      // Stage-wise pending counts
+      // Stage-wise pending counts (only orders created that day)
       const stages = [
         { name: 'printing', condition: 'design_done = 1 AND printing_done = 0' },
         { name: 'fusing', condition: 'design_done = 1 AND printing_done = 1 AND fusing_done = 0' },
@@ -428,12 +429,13 @@ app.get('/api/weekly-summary-table', async (req, res) => {
 
       for (const stage of stages) {
         const [rows] = await pool.query(
-          `SELECT COUNT(*) AS cnt FROM order_progress
-            WHERE ${stage.condition}
-            AND DATE(created_at) = ?`,
+          `SELECT COUNT(*) AS cnt
+           FROM order_progress
+           WHERE ${stage.condition}
+           AND DATE(created_at) = ?`,
           [formattedDate]
         );
-        dayData[`${stage.name}_user`] = rows[0].cnt;
+        dayData[`${stage.name}_user`] = rows[0].cnt || 0;
       }
 
       results.push(dayData);

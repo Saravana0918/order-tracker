@@ -461,17 +461,45 @@ app.get('/api/user-orders/:username', async (req, res) => {
                IF(design_done = 1, 'Done', 'Pending') AS status,
                updated_at
         FROM order_progress
-        WHERE design_assignee = ?
+        WHERE design_assignee = ? AND design_done = 0
         ORDER BY updated_at DESC`;
       params = [username];
-    } else {
+
+    } else if (role === 'printing') {
       query = `
         SELECT order_id, order_name, customer_name, 
-               IF(${role}_done = 1, 'Done', 'Pending') AS status,
+               IF(printing_done = 1, 'Done', 'Pending') AS status,
                updated_at
         FROM order_progress
+        WHERE design_done = 1 AND printing_done = 0
         ORDER BY updated_at DESC`;
-      params = [];
+
+    } else if (role === 'fusing') {
+      query = `
+        SELECT order_id, order_name, customer_name, 
+               IF(fusing_done = 1, 'Done', 'Pending') AS status,
+               updated_at
+        FROM order_progress
+        WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 0
+        ORDER BY updated_at DESC`;
+
+    } else if (role === 'stitching') {
+      query = `
+        SELECT order_id, order_name, customer_name, 
+               IF(stitching_done = 1, 'Done', 'Pending') AS status,
+               updated_at
+        FROM order_progress
+        WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 0
+        ORDER BY updated_at DESC`;
+
+    } else if (role === 'shipping') {
+      query = `
+        SELECT order_id, order_name, customer_name, 
+               IF(shipping_done = 1, 'Done', 'Pending') AS status,
+               updated_at
+        FROM order_progress
+        WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0
+        ORDER BY updated_at DESC`;
     }
 
     const [orders] = await pool.query(query, params);

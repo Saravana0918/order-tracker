@@ -137,29 +137,28 @@ app.get('/api/orders', async (req, res) => {
   const user = req.headers['x-user-name'];
 
   try {
-    let sql = `
-      SELECT
-        order_id,
-        order_name,
-        customer_name,
-        total_price        AS price,
-        fulfillment_status AS fulfillment,
-        payment_status     AS payment,
-        shipping_method    AS shiptype,
-        item_count         AS items,
-        tags,
-        address,
-        design_done,
-        printing_done,
-        fusing_done,
-        stitching_done,
-        shipping_done,
-        updated_at,
-        design_image,
-        design_assignee
-      FROM order_progress
-      WHERE DATE(created_at) = CURDATE()
-    `;
+      let sql = `
+    SELECT
+      order_id,
+      order_name,
+      customer_name,
+      total_price        AS price,
+      fulfillment_status AS fulfillment,
+      payment_status     AS payment,
+      shipping_method    AS shiptype,
+      item_count         AS items,
+      tags,
+      address,
+      design_done,
+      printing_done,
+      fusing_done,
+      stitching_done,
+      shipping_done,
+      updated_at,
+      design_image,
+      design_assignee
+    FROM order_progress
+  `;
 
     const params = [];
 

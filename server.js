@@ -138,27 +138,29 @@ app.get('/api/orders', async (req, res) => {
 
   try {
       let sql = `
-    SELECT
-      order_id,
-      order_name,
-      customer_name,
-      total_price        AS price,
-      fulfillment_status AS fulfillment,
-      payment_status     AS payment,
-      shipping_method    AS shiptype,
-      item_count         AS items,
-      tags,
-      address,
-      design_done,
-      printing_done,
-      fusing_done,
-      stitching_done,
-      shipping_done,
-      updated_at,
-      design_image,
-      design_assignee
-    FROM order_progress
-  `;
+      SELECT
+        order_id,
+        order_name,
+        customer_name,
+        total_price        AS price,
+        fulfillment_status AS fulfillment,
+        payment_status     AS payment,
+        shipping_method    AS shiptype,
+        item_count         AS items,
+        tags,
+        address,
+        design_done,
+        printing_done,
+        fusing_done,
+        stitching_done,
+        shipping_done,
+        updated_at,
+        design_image,
+        design_assignee
+      FROM order_progress
+      WHERE 1=1
+    `;
+
 
     const params = [];
 
@@ -330,32 +332,37 @@ app.get('/api/weekly-summary', async (req, res) => {
         query = `
           SELECT COUNT(*) AS orderCount
           FROM order_progress
-          WHERE design_assignee = ? AND design_done = 0
+          WHERE design_assignee = ?
+          AND (design_done IS NULL OR design_done = 0)
         `;
         params = [user.username];
       } else if (user.role === 'printing') {
         query = `
           SELECT COUNT(*) AS orderCount
           FROM order_progress
-          WHERE design_done = 1 AND printing_done = 0
+          WHERE design_done = 1
+          AND (printing_done IS NULL OR printing_done = 0)
         `;
       } else if (user.role === 'fusing') {
         query = `
           SELECT COUNT(*) AS orderCount
           FROM order_progress
-          WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 0
+          WHERE design_done = 1 AND printing_done = 1
+          AND (fusing_done IS NULL OR fusing_done = 0)
         `;
       } else if (user.role === 'stitching') {
         query = `
           SELECT COUNT(*) AS orderCount
           FROM order_progress
-          WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 0
+          WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 1
+          AND (stitching_done IS NULL OR stitching_done = 0)
         `;
       } else if (user.role === 'shipping') {
         query = `
           SELECT COUNT(*) AS orderCount
           FROM order_progress
-          WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0
+          WHERE design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1
+          AND (shipping_done IS NULL OR shipping_done = 0)
         `;
       }
 
@@ -369,6 +376,7 @@ app.get('/api/weekly-summary', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
+
 
 
 

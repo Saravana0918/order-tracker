@@ -158,7 +158,7 @@ app.get('/api/orders', async (req, res) => {
         design_image,
         design_assignee
       FROM order_progress
-      WHERE 1=1
+      WHERE DATE(created_at) = CURDATE()
     `;
 
 
@@ -233,7 +233,7 @@ app.post('/api/sync-orders', async (req, res) => {
             order_id, order_name, customer_name,
             total_price, fulfillment_status, payment_status,
             shipping_method, item_count, tags, address, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
           [
             orderId, o.name, customerName,
             o.total_price || 0,
@@ -242,7 +242,8 @@ app.post('/api/sync-orders', async (req, res) => {
             o.shipping_lines?.[0]?.title || '',
             o.line_items?.length || 0,
             o.tags || '',
-            address
+            address,
+            new Date(o.created_at)
           ]
         );
         imported++;
@@ -406,9 +407,9 @@ app.get('/api/weekly-summary-table', async (req, res) => {
       for (const designer of designers) {
         const [rows] = await pool.query(
           `SELECT COUNT(*) AS cnt FROM order_progress
-           WHERE design_assignee = ? 
-           AND design_done = 0 
-           AND DATE(updated_at) <= ?`,
+            WHERE design_assignee = ? 
+            AND design_done = 0 
+            AND DATE(created_at) = ?`,
           [designer.username, formattedDate]
         );
         dayData[designer.username] = rows[0].cnt;
@@ -425,8 +426,8 @@ app.get('/api/weekly-summary-table', async (req, res) => {
       for (const stage of stages) {
         const [rows] = await pool.query(
           `SELECT COUNT(*) AS cnt FROM order_progress
-           WHERE ${stage.condition}
-           AND DATE(updated_at) <= ?`,
+            WHERE ${stage.condition}
+            AND DATE(created_at) = ?`,
           [formattedDate]
         );
         dayData[`${stage.name}_user`] = rows[0].cnt;

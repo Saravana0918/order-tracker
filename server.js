@@ -165,9 +165,13 @@ app.get('/api/orders', async (req, res) => {
     const params = [];
 
     if (role === 'design') {
-      sql += ' AND (design_done IS NULL OR design_done = 0) AND design_assignee = ?';
-      params.push(user);
-    } else if (role === 'printing') {
+    sql += ' AND (design_done IS NULL OR design_done = 0) AND design_assignee = ?';
+    params.push(user);
+    } 
+    else if (role === 'customer') {
+      sql += ' AND (design_assignee IS NULL OR design_assignee = "")';
+    }
+    else if (role === 'printing') {
       sql += ' AND design_done = 1 AND printing_done = 0';
     } else if (role === 'fusing') {
       sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 0';
@@ -176,6 +180,7 @@ app.get('/api/orders', async (req, res) => {
     } else if (role === 'shipping') {
       sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0';
     }
+
 
     sql += ' ORDER BY updated_at DESC';
     const [rows] = await pool.execute(sql, params);

@@ -187,7 +187,6 @@ app.get('/api/orders', async (req, res) => {
 
 
 /* -------- Sync Shopify Orders (Manual Refresh) -------- */
-/* -------- Sync Shopify Orders (Manual Refresh) -------- */
 app.post('/api/sync-orders', async (req, res) => {
   try {
     const shopifyRes = await axios.get(
@@ -199,16 +198,16 @@ app.post('/api/sync-orders', async (req, res) => {
     );
 
     let imported = 0;
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
 
-    // Get yesterday date
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayDate = yesterday.toISOString().split('T')[0]; // yyyy-mm-dd
 
     for (const o of shopifyRes.data.orders) {
       const orderDate = new Date(o.created_at).toISOString().split('T')[0];
 
-      // Skip orders created before yesterday
+      // Skip orders older than yesterday
       if (orderDate < yesterdayDate) continue;
 
       const orderId = o.id.toString();
@@ -250,6 +249,7 @@ app.post('/api/sync-orders', async (req, res) => {
     res.status(500).json({ success: false, error: 'Shopify sync failed' });
   }
 });
+
 
 
 /* -------- Login -------- */

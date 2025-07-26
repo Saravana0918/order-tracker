@@ -204,18 +204,8 @@ app.post('/api/sync-orders', async (req, res) => {
     );
 
     let imported = 0;
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-
-    const yesterdayDate = yesterday.toISOString().split('T')[0]; // yyyy-mm-dd
 
     for (const o of shopifyRes.data.orders) {
-      const orderDate = new Date(o.created_at).toISOString().split('T')[0];
-
-      // Skip orders older than yesterday
-      if (orderDate < yesterdayDate) continue;
-
       const orderId = o.id.toString();
       const [exists] = await pool.execute(
         'SELECT 1 FROM order_progress WHERE order_id = ?',
@@ -228,8 +218,7 @@ app.post('/api/sync-orders', async (req, res) => {
         : '';
 
       if (!exists.length) {
-        const shopifyCreatedAt = new Date(o.created_at); 
-
+        const shopifyCreatedAt = new Date(o.created_at);
         await pool.execute(
           `INSERT INTO order_progress (
             order_id, order_name, customer_name,
@@ -246,7 +235,7 @@ app.post('/api/sync-orders', async (req, res) => {
             o.tags || '',
             address,
             shopifyCreatedAt,
-            shopifyCreatedAt 
+            shopifyCreatedAt
           ]
         );
         imported++;
@@ -259,8 +248,6 @@ app.post('/api/sync-orders', async (req, res) => {
     res.status(500).json({ success: false, error: 'Shopify sync failed' });
   }
 });
-
-
 
 /* -------- Login -------- */
 app.post('/api/login', async (req, res) => {

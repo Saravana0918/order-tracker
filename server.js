@@ -137,7 +137,7 @@ app.get('/api/orders', async (req, res) => {
   const user = req.headers['x-user-name'];
 
   try {
-      let sql = `
+    let sql = `
       SELECT
         order_id,
         order_name,
@@ -158,20 +158,17 @@ app.get('/api/orders', async (req, res) => {
         design_image,
         design_assignee
       FROM order_progress
-      WHERE DATE(created_at) = CURDATE()
+      WHERE DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))
     `;
-
 
     const params = [];
 
     if (role === 'design') {
-    sql += ' AND (design_done IS NULL OR design_done = 0) AND design_assignee = ?';
-    params.push(user);
-    } 
-    else if (role === 'customer') {
+      sql += ' AND (design_done IS NULL OR design_done = 0) AND design_assignee = ?';
+      params.push(user);
+    } else if (role === 'customer') {
       sql += ' AND (design_assignee IS NULL OR design_assignee = "")';
-    }
-    else if (role === 'printing') {
+    } else if (role === 'printing') {
       sql += ' AND design_done = 1 AND printing_done = 0';
     } else if (role === 'fusing') {
       sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 0';
@@ -181,7 +178,6 @@ app.get('/api/orders', async (req, res) => {
       sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0';
     }
 
-
     sql += ' ORDER BY updated_at DESC';
     const [rows] = await pool.execute(sql, params);
     res.json({ orders: rows });
@@ -190,7 +186,6 @@ app.get('/api/orders', async (req, res) => {
     res.status(500).json({ error: 'Failed to load orders' });
   }
 });
-
 
 /* -------- Sync Shopify Orders (Manual Refresh) -------- */
 app.post('/api/sync-orders', async (req, res) => {
@@ -219,6 +214,7 @@ app.post('/api/sync-orders', async (req, res) => {
 
       if (!exists.length) {
         const shopifyCreatedAt = new Date(o.created_at);
+
         await pool.execute(
           `INSERT INTO order_progress (
             order_id, order_name, customer_name,
@@ -248,6 +244,7 @@ app.post('/api/sync-orders', async (req, res) => {
     res.status(500).json({ success: false, error: 'Shopify sync failed' });
   }
 });
+
 
 /* -------- Login -------- */
 app.post('/api/login', async (req, res) => {
@@ -399,7 +396,7 @@ app.get('/api/weekly-summary-table', async (req, res) => {
           `SELECT COUNT(*) AS cnt FROM order_progress
            WHERE design_assignee = ? 
            AND design_done = 0 
-           AND DATE(created_at) = ?`,
+           AND DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = ?`,
           [designer.username, formattedDate]
         );
         dayData[designer.username] = rows[0].cnt;
@@ -417,7 +414,7 @@ app.get('/api/weekly-summary-table', async (req, res) => {
         const [rows] = await pool.query(
           `SELECT COUNT(*) AS cnt FROM order_progress
            WHERE ${stage.condition}
-           AND DATE(created_at) = ?`,
+           AND DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = ?`,
           [formattedDate]
         );
         dayData[`${stage.name}_user`] = rows[0].cnt;
@@ -432,6 +429,7 @@ app.get('/api/weekly-summary-table', async (req, res) => {
     res.status(500).json({ error: 'DB Error' });
   }
 });
+
 
 // Get pending orders for a specific user in last 7 days
 app.get('/api/user-orders/:username', async (req, res) => {

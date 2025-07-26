@@ -178,7 +178,7 @@ app.get('/api/orders', async (req, res) => {
       sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0';
     }
 
-    sql += ' ORDER BY updated_at DESC';
+    sql += ' ORDER BY created_at DESC LIMIT 50';
     const [rows] = await pool.execute(sql, params);
     res.json({ orders: rows });
   } catch (err) {

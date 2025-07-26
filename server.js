@@ -158,7 +158,7 @@ app.get('/api/orders', async (req, res) => {
         design_image,
         design_assignee
       FROM order_progress
-      WHERE DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))
+      WHERE DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) >= DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30')) - INTERVAL 1 DAY
     `;
 
     const params = [];
@@ -178,7 +178,7 @@ app.get('/api/orders', async (req, res) => {
       sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0';
     }
 
-    sql += ' ORDER BY created_at DESC LIMIT 50';
+    sql += ' ORDER BY updated_at DESC';
     const [rows] = await pool.execute(sql, params);
     res.json({ orders: rows });
   } catch (err) {
@@ -186,6 +186,7 @@ app.get('/api/orders', async (req, res) => {
     res.status(500).json({ error: 'Failed to load orders' });
   }
 });
+
 
 /* -------- Sync Shopify Orders (Manual Refresh) -------- */
 app.post('/api/sync-orders', async (req, res) => {

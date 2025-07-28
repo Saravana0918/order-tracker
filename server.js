@@ -158,34 +158,72 @@ app.get('/api/orders', async (req, res) => {
         design_image,
         design_assignee
       FROM order_progress
-      WHERE DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) >= DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30')) - INTERVAL 1 DAY
+      WHERE 1=1
     `;
 
     const params = [];
 
     if (role === 'design') {
-      sql += ' AND (design_done IS NULL OR design_done = 0) AND design_assignee = ?';
+      // Show all pending assigned orders + today's new unassigned orders
+      sql += `
+        AND design_done = 0
+        AND (design_assignee = ? OR (design_assignee IS NULL AND DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))))
+      `;
       params.push(user);
+
     } else if (role === 'customer') {
-      sql += ' AND (design_assignee IS NULL OR design_assignee = "")';
+      // Show today's unassigned orders
+      sql += `
+        AND (design_assignee IS NULL OR design_assignee = '')
+        AND DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))
+      `;
+
     } else if (role === 'printing') {
-      sql += ' AND design_done = 1 AND printing_done = 0';
+      // Show all pending printing orders
+      sql += `
+        AND design_done = 1
+        AND printing_done = 0
+      `;
+
     } else if (role === 'fusing') {
-      sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 0';
+      // Show all pending fusing orders
+      sql += `
+        AND design_done = 1
+        AND printing_done = 1
+        AND fusing_done = 0
+      `;
+
     } else if (role === 'stitching') {
-      sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 0';
+      // Show all pending stitching orders
+      sql += `
+        AND design_done = 1
+        AND printing_done = 1
+        AND fusing_done = 1
+        AND stitching_done = 0
+      `;
+
     } else if (role === 'shipping') {
-      sql += ' AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0';
+      // Show all pending shipping orders
+      sql += `
+        AND design_done = 1
+        AND printing_done = 1
+        AND fusing_done = 1
+        AND stitching_done = 1
+        AND shipping_done = 0
+      `;
     }
 
     sql += ' ORDER BY updated_at DESC';
+
     const [rows] = await pool.execute(sql, params);
     res.json({ orders: rows });
+
   } catch (err) {
     console.error('❌ Error loading orders:', err);
     res.status(500).json({ error: 'Failed to load orders' });
   }
 });
+
 
 
 /* -------- Sync Shopify Orders (Manual Refresh) -------- */

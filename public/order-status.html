@@ -441,7 +441,7 @@ function renderTable(){
     const tr=document.createElement('tr'); 
     let html='';
 
-    const updatedTime = parseDateString(r.updated_at);
+    const updatedTime = parseDateString(r.created_at);
     const diffHours = (now - updatedTime) / (1000 * 60 * 60);
     if (diffHours > 48) tr.classList.add('row-expired');
 
@@ -477,7 +477,7 @@ function renderTable(){
                  title="Click to enlarge" onclick="window.open('/uploads/design/${r.design_image}','_blank')">`
           : '-';
       }
-      else if(col==='updated') value = new Date(r.updated_at).toLocaleString();
+      else if(col==='updated') value = new Date(r.created_at).toLocaleString();
       else if(col==='actions'){
         if(userRole.startsWith('design') && !r.design_done && r.design_assignee===username){
           value=`<div class="d-flex flex-column gap-1">

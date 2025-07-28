@@ -154,10 +154,9 @@ app.get('/api/orders', async (req, res) => {
         fusing_done,
         stitching_done,
         shipping_done,
-        updated_at,
+        created_at,        -- use Shopify's created_at
         design_image,
-        design_assignee,
-        created_at
+        design_assignee
       FROM order_progress
       WHERE 1=1
     `;
@@ -165,52 +164,27 @@ app.get('/api/orders', async (req, res) => {
     const params = [];
 
     if (role === 'design') {
-      // Show all pending assigned orders + today's new unassigned orders
       sql += `
         AND design_done = 0
         AND (design_assignee = ? OR (design_assignee IS NULL AND DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))))
       `;
       params.push(user);
-
     } else if (role === 'customer') {
-      // Show only today's unassigned orders
       sql += `
         AND (design_assignee IS NULL OR design_assignee = '')
         AND DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))
       `;
-
     } else if (role === 'printing') {
-      sql += `
-        AND design_done = 1
-        AND printing_done = 0
-      `;
-
+      sql += ` AND design_done = 1 AND printing_done = 0 `;
     } else if (role === 'fusing') {
-      sql += `
-        AND design_done = 1
-        AND printing_done = 1
-        AND fusing_done = 0
-      `;
-
+      sql += ` AND design_done = 1 AND printing_done = 1 AND fusing_done = 0 `;
     } else if (role === 'stitching') {
-      sql += `
-        AND design_done = 1
-        AND printing_done = 1
-        AND fusing_done = 1
-        AND stitching_done = 0
-      `;
-
+      sql += ` AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 0 `;
     } else if (role === 'shipping') {
-      sql += `
-        AND design_done = 1
-        AND printing_done = 1
-        AND fusing_done = 1
-        AND stitching_done = 1
-        AND shipping_done = 0
-      `;
+      sql += ` AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0 `;
     }
 
-    sql += ' ORDER BY created_at DESC';  // Sort by Shopify created date
+    sql += ' ORDER BY created_at DESC';
     const [rows] = await pool.execute(sql, params);
     res.json({ orders: rows });
 

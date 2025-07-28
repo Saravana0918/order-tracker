@@ -156,7 +156,8 @@ app.get('/api/orders', async (req, res) => {
         shipping_done,
         updated_at,
         design_image,
-        design_assignee
+        design_assignee,
+        created_at
       FROM order_progress
       WHERE 1=1
     `;
@@ -172,21 +173,19 @@ app.get('/api/orders', async (req, res) => {
       params.push(user);
 
     } else if (role === 'customer') {
-      // Show today's unassigned orders
+      // Show only today's unassigned orders
       sql += `
         AND (design_assignee IS NULL OR design_assignee = '')
         AND DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))
       `;
 
     } else if (role === 'printing') {
-      // Show all pending printing orders
       sql += `
         AND design_done = 1
         AND printing_done = 0
       `;
 
     } else if (role === 'fusing') {
-      // Show all pending fusing orders
       sql += `
         AND design_done = 1
         AND printing_done = 1
@@ -194,7 +193,6 @@ app.get('/api/orders', async (req, res) => {
       `;
 
     } else if (role === 'stitching') {
-      // Show all pending stitching orders
       sql += `
         AND design_done = 1
         AND printing_done = 1
@@ -203,7 +201,6 @@ app.get('/api/orders', async (req, res) => {
       `;
 
     } else if (role === 'shipping') {
-      // Show all pending shipping orders
       sql += `
         AND design_done = 1
         AND printing_done = 1
@@ -213,8 +210,7 @@ app.get('/api/orders', async (req, res) => {
       `;
     }
 
-    sql += ' ORDER BY updated_at DESC';
-
+    sql += ' ORDER BY created_at DESC';  // Sort by Shopify created date
     const [rows] = await pool.execute(sql, params);
     res.json({ orders: rows });
 

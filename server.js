@@ -169,11 +169,6 @@ app.get('/api/orders', async (req, res) => {
         AND (design_assignee = ? OR (design_assignee IS NULL AND DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))))
       `;
       params.push(user);
-    } else if (role === 'customer') {
-      sql += `
-        AND (design_assignee IS NULL OR design_assignee = '')
-        AND DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))
-      `;
     } else if (role === 'printing') {
       sql += ` AND design_done = 1 AND printing_done = 0 `;
     } else if (role === 'fusing') {

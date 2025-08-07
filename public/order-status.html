@@ -356,9 +356,9 @@ async function quickDone(orderId) {
 
 document.addEventListener('DOMContentLoaded', () => {
   const role = localStorage.getItem('role');
-  if (role === 'admin') {
-    document.getElementById('summaryBox').style.display = 'block';
-  }
+  if (role === 'admin' || role === 'customer') {
+  document.getElementById('summaryBox').style.display = 'block';
+}
 });
 
 async function fetchSummary() {

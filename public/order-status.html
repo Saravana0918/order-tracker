@@ -38,6 +38,14 @@
            placeholder="Search Order ID…" onkeyup="filterOrders()">
   </div>
 
+  <!-- DAILY ORDER COUNTS -->
+<div id="dailyStats" class="d-flex flex-wrap gap-2 my-2">
+  <div class="stat-card">Today: <b id="countToday">0</b></div>
+  <div class="stat-card">Yesterday: <b id="countYday">0</b></div>
+  <div class="stat-card">Last 7 Days: <b id="count7">0</b></div>
+  <div class="stat-card">This Month: <b id="countMonth">0</b></div>
+</div>
+
      <button class="btn btn-primary" id="homeBtn">Home</button>
 
   <div id="summaryBox" style="display: none; margin-bottom: 20px;">
@@ -179,6 +187,7 @@ async function loadOrders() {
   }
 
   renderTable();
+  renderDailyCounts(allOrders);
 }
 
 async function loadWeeklySummary() {
@@ -304,6 +313,55 @@ function filterOrders(){
   });
   renderTable();
 }
+
+// ───────── Daily Counts ─────────
+function renderDailyCounts(orders){
+  // Helper: YYYY-MM-DD
+  const iso = (d) => new Date(d).toISOString().slice(0,10);
+
+  const today = new Date();
+  const todayStr = iso(today);
+
+  const byDay = {};
+  for (const o of orders){
+    const d = o.created_at || o.createdAt || o.updated_at || o.createdAt; // fallback
+    if (!d) continue;
+    const key = iso(d);
+    byDay[key] = (byDay[key] || 0) + 1;
+  }
+
+  // Today
+  const cToday = byDay[todayStr] || 0;
+
+  // Yesterday
+  const y = new Date(today); y.setDate(y.getDate()-1);
+  const cYday = byDay[iso(y)] || 0;
+
+  // Last 7 days (including today)
+  let c7 = 0;
+  for (let i=0;i<7;i++){
+    const d = new Date(today); d.setDate(d.getDate()-i);
+    c7 += (byDay[iso(d)] || 0);
+  }
+
+  // This month
+  const mStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  let cMonth = 0;
+  Object.keys(byDay).forEach(k=>{
+    const kd = new Date(k);
+    if (kd >= mStart && kd <= today) cMonth += byDay[k];
+  });
+
+  // Update UI
+  const tEl = document.getElementById('countToday');
+  if (!tEl) return; // if block hidden, skip
+
+  tEl.textContent = cToday;
+  document.getElementById('countYday').textContent  = cYday;
+  document.getElementById('count7').textContent     = c7;
+  document.getElementById('countMonth').textContent = cMonth;
+}
+
 
 /* ───────────── Assign designer ───────────── */
 async function assignDesigner(orderId){

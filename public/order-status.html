@@ -317,16 +317,24 @@ function filterOrders(){
 // ───────── Daily Counts ─────────
 function renderDailyCounts(orders){
   // Helper: YYYY-MM-DD
-  const iso = (d) => new Date(d).toISOString().slice(0,10);
+  // Local YYYY-MM-DD key (no UTC conversion)
+  const dayKeyLocal = (d) => {
+    const x = new Date(d);
+    const y = x.getFullYear();
+    const m = String(x.getMonth() + 1).padStart(2, '0');
+    const dd = String(x.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
+
 
   const today = new Date();
-  const todayStr = iso(today);
+  const todayStr = dayKeyLocal(today);
 
   const byDay = {};
   for (const o of orders){
-    const d = o.created_at || o.createdAt || o.updated_at || o.createdAt; // fallback
+    const d = o.created_at || o.createdAt || o.updated_at;
     if (!d) continue;
-    const key = iso(d);
+    const key = dayKeyLocal(d);        // << here
     byDay[key] = (byDay[key] || 0) + 1;
   }
 
@@ -335,13 +343,13 @@ function renderDailyCounts(orders){
 
   // Yesterday
   const y = new Date(today); y.setDate(y.getDate()-1);
-  const cYday = byDay[iso(y)] || 0;
+  const cYday = byDay[dayKeyLocal(y)] || 0; 
 
   // Last 7 days (including today)
   let c7 = 0;
   for (let i=0;i<7;i++){
     const d = new Date(today); d.setDate(d.getDate()-i);
-    c7 += (byDay[iso(d)] || 0);
+    c7 += (byDay[dayKeyLocal(d)] || 0);       // << here
   }
 
   // This month

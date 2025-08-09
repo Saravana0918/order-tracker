@@ -17,6 +17,26 @@
     .btn-add        { border-radius:50px; }
     table.table-hover tbody tr.row-expired td {background-color: #f8d7da !important; color: #721c24 !important;}
     #homeBtn {position: fixed;bottom: 20px;right: 20px;z-index: 999;border-radius: 50px;padding: 10px 20px;display: none;}
+    .kpi-card{
+      display:flex; align-items:center; gap:12px;
+      padding:14px 16px; border-radius:14px; background:#fff;
+      box-shadow:0 6px 20px rgba(0,0,0,.06); border:1px solid #eef0f4;
+      transition:.2s transform, .2s box-shadow;
+    }
+    .kpi-card:hover{ transform:translateY(-2px); box-shadow:0 10px 30px rgba(0,0,0,.08); }
+
+    .kpi-icon{
+      width:44px; height:44px; display:grid; place-items:center;
+      border-radius:12px; color:#fff; font-size:18px; flex:0 0 44px;
+    }
+    .kpi-meta small{ color:#6b7280; font-weight:600; letter-spacing:.2px; }
+    .kpi-meta h4{ margin:0; font-weight:800; color:#111827; }
+
+    .kpi-today  .kpi-icon{ background:linear-gradient(135deg,#22c55e,#16a34a);}
+    .kpi-yday   .kpi-icon{ background:linear-gradient(135deg,#f59e0b,#d97706);}
+    .kpi-week   .kpi-icon{ background:linear-gradient(135deg,#6366f1,#4f46e5);}
+    .kpi-month  .kpi-icon{ background:linear-gradient(135deg,#06b6d4,#0891b2);}
+
   </style>
 </head>
 <body class="p-4">
@@ -38,13 +58,38 @@
            placeholder="Search Order ID…" onkeyup="filterOrders()">
   </div>
 
-  <!-- DAILY ORDER COUNTS -->
-<div id="dailyStats" class="d-flex flex-wrap gap-2 my-2">
-  <div class="stat-card">Today: <b id="countToday">0</b></div>
-  <div class="stat-card">Yesterday: <b id="countYday">0</b></div>
-  <div class="stat-card">Last 7 Days: <b id="count7">0</b></div>
-  <div class="stat-card">This Month: <b id="countMonth">0</b></div>
+<!-- DAILY ORDER COUNTS (Only admin/customer) -->
+<div id="dailyStatsWrapper" style="display:none;">
+  <div class="row g-3" id="dailyStats">
+    <!-- SAME KPI CARDS AS BEFORE -->
+    <div class="col-6 col-md-3">
+      <div class="kpi-card kpi-today">
+        <div class="kpi-icon"><i class="fa-solid fa-calendar-day"></i></div>
+        <div class="kpi-meta"><small>Today</small><h4 id="countToday">0</h4></div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card kpi-yday">
+        <div class="kpi-icon"><i class="fa-regular fa-calendar"></i></div>
+        <div class="kpi-meta"><small>Yesterday</small><h4 id="countYday">0</h4></div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card kpi-week">
+        <div class="kpi-icon"><i class="fa-solid fa-chart-line"></i></div>
+        <div class="kpi-meta"><small>Last 7 Days</small><h4 id="count7">0</h4></div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card kpi-month">
+        <div class="kpi-icon"><i class="fa-regular fa-calendar-days"></i></div>
+        <div class="kpi-meta"><small>This Month</small><h4 id="countMonth">0</h4></div>
+      </div>
+    </div>
+  </div>
 </div>
+
+
 
      <button class="btn btn-primary" id="homeBtn">Home</button>
 
@@ -145,8 +190,14 @@ function checkLogin(){
   // Show weekly performance only for admin & customer
   if (userRole === 'admin' || userRole === 'customer') {
     document.getElementById('weeklyPerformanceCard').style.display = 'block';
+    const statsWrap = document.getElementById('dailyStatsWrapper');
+    if (statsWrap) statsWrap.style.display = 'block';  // ✅ Show KPI cards
+  } else {
+    const statsWrap = document.getElementById('dailyStatsWrapper');
+    if (statsWrap) statsWrap.style.display = 'none';   // ❌ Hide KPI cards
   }
 }
+
 
 function parseDateString(dateStr) {
   return new Date(dateStr); // Works if dateStr is in valid SQL datetime format
@@ -180,15 +231,25 @@ async function loadOrders() {
   const data = await res.json();
   allOrders = data.orders || [];
 
-  if (userRole.startsWith('design_user')) {
+  if (userRole && userRole.startsWith('design_user')) {
     filteredOrders = allOrders.filter(o => o.design_assignee === username);
   } else {
     filteredOrders = [...allOrders];
   }
 
   renderTable();
-  renderDailyCounts(allOrders);
+
+  // 👇 Show daily counts ONLY for admin / customer
+  if (userRole === 'admin' || userRole === 'customer') {
+    const statsWrap = document.getElementById('dailyStatsWrapper');
+    if (statsWrap) statsWrap.style.display = 'block';
+    renderDailyCounts(allOrders);
+  } else {
+    const statsWrap = document.getElementById('dailyStatsWrapper');
+    if (statsWrap) statsWrap.style.display = 'none';
+  }
 }
+
 
 async function loadWeeklySummary() {
   try {

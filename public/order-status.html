@@ -363,29 +363,21 @@ async function loadDispatchSummaryTable() {
     if (!Array.isArray(data) || !data.length) return;
 
     const headerRow = document.getElementById('dispatch-summary-header');
-    const body = document.getElementById('dispatch-summary-body');
-    headerRow.innerHTML = '';
+    const body      = document.getElementById('dispatch-summary-body');
+
+    // Show ONLY Date and Total
+    headerRow.innerHTML = `<th>Date</th><th>Total</th>`;
     body.innerHTML = '';
 
-    // Ensure 'date' then 'total' first, followed by the rest (designers + stages)
-    const keys = Object.keys(data[0]);
-    const fixed = ['date', 'total'];
-    const others = keys.filter(k => !fixed.includes(k));
-    const cols = [...fixed, ...others];
-
-    headerRow.innerHTML = cols.map(k => `<th>${k}</th>`).join('');
-
     for (const r of data) {
-      let rowHTML = '';
-      for (const k of cols) rowHTML += `<td>${r[k]}</td>`;
-      body.innerHTML += `<tr>${rowHTML}</tr>`;
+      const date  = r.date || '';
+      const total = Number(r.total || 0);
+      body.innerHTML += `<tr><td>${date}</td><td>${total}</td></tr>`;
     }
   } catch (e) {
     console.error('Error loading dispatch summary:', e);
   }
 }
-
-
 
 /* ───────────── Show User Orders ───────────── */
 async function showUserOrders(username) {

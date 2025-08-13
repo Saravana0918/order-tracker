@@ -110,6 +110,19 @@
     <button class="btn btn-secondary btn-sm mb-2" onclick="loadWeeklyPendingTable()">Refresh</button>
   </h4>
 
+  <h4 class="mt-4 d-flex align-items-center justify-content-between">
+  Dispatch Date Summary (Last 7 Days)
+  <button class="btn btn-secondary btn-sm mb-2" onclick="loadDispatchSummaryTable()">Refresh</button>
+</h4>
+
+<div class="table-responsive">
+  <table class="table table-bordered text-center" id="dispatch-summary-table">
+    <thead><tr id="dispatch-summary-header"></tr></thead>
+    <tbody id="dispatch-summary-body"></tbody>
+  </table>
+</div>
+
+
   <div id="weekly-summary-container" class="table-responsive">
     <table class="table table-bordered text-center" id="weekly-summary-table">
       <thead>
@@ -340,6 +353,37 @@ async function loadWeeklyPendingTable() {
   }
 }
 document.addEventListener('DOMContentLoaded', loadWeeklyPendingTable);
+
+
+async function loadDispatchSummaryTable() {
+  try {
+    const res = await fetch('/api/dispatch-summary-table');
+    const data = await res.json();
+    if (!Array.isArray(data) || !data.length) return;
+
+    const headerRow = document.getElementById('dispatch-summary-header');
+    const body = document.getElementById('dispatch-summary-body');
+    headerRow.innerHTML = '';
+    body.innerHTML = '';
+
+    // Build columns from first row keys
+    const keys = Object.keys(data[0]); // ["date","srikanth","kushi",...,"printing_user",...]
+    headerRow.innerHTML = `<th>Date</th>` + keys.slice(1).map(k => `<th>${k}</th>`).join('');
+
+    // Rows
+    for (const r of data) {
+      let tds = `<td>${r.date}</td>`;
+      for (const k of keys.slice(1)) tds += `<td>${r[k]}</td>`;
+      body.innerHTML += `<tr>${tds}</tr>`;
+    }
+  } catch (e) {
+    console.error('Error loading dispatch summary:', e);
+  }
+}
+
+// auto-load with the others
+document.addEventListener('DOMContentLoaded', loadDispatchSummaryTable);
+
 
 /* ───────────── Show User Orders ───────────── */
 async function showUserOrders(username) {

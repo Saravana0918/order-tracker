@@ -81,34 +81,30 @@ app.post('/api/upload-design', upload.single('image'), async (req, res) => {
   }
 });
 
-// Save/Update dispatch date for an order
-// Make sure this is after: app.use(express.json())
 app.post('/api/set-dispatch-date', async (req, res) => {
   try {
     const { order_id, dispatch_date } = req.body;
-
     if (!order_id || !dispatch_date) {
       return res.status(400).json({ success: false, error: 'Missing order_id or dispatch_date' });
     }
 
-    // Update the correct table: order_progress (NOT railway.orders)
-    // Some rows may be identified by order_name (e.g., "#19439"), so match either.
+    const id = String(order_id);
     const [result] = await pool.query(
       'UPDATE `order_progress` SET `dispatch_date` = ? WHERE `order_id` = ? OR `order_name` = ?',
-      [dispatch_date, String(order_id), String(order_id)]
+      [dispatch_date, id, id]
     );
 
     if (result.affectedRows === 0) {
-      // Helpful message if the id didn’t match any row
       return res.status(404).json({ success: false, error: 'Order not found in order_progress' });
     }
 
-    return res.json({ success: true });
+    res.json({ success: true });
   } catch (err) {
     console.error('set-dispatch-date error:', err);
-    return res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 /* -------- Assign designer -------- */
 app.post('/api/assign-designer', async (req, res) => {
@@ -183,9 +179,10 @@ app.get('/api/orders', async (req, res) => {
         fusing_done,
         stitching_done,
         shipping_done,
-        created_at,        -- use Shopify's created_at
+        created_at,                -- Shopify created_at
         design_image,
-        design_assignee
+        design_assignee,
+        DATE_FORMAT(dispatch_date, '%Y-%m-%d') AS dispatch_date   -- ✅ add this line
       FROM order_progress
       WHERE 1=1
     `;
@@ -217,7 +214,6 @@ app.get('/api/orders', async (req, res) => {
     res.status(500).json({ error: 'Failed to load orders' });
   }
 });
-
 
 
 /* -------- Sync Shopify Orders (Manual Refresh) -------- */
@@ -305,15 +301,13 @@ app.post('/api/quick-done', async (req, res) => {
     return res.status(400).json({ error: 'Invalid request' });
 
   try {
-    await db.execute(
-      `UPDATE order_progress SET ${role}_done = 'Done', updated_at = NOW() WHERE order_id = ?`,
-      [order_id]
+    // use pool (not db), and set to 1 (tinyint) instead of 'Done'
+    await pool.execute(
+      `UPDATE order_progress SET ${role}_done = 1, updated_at = NOW() WHERE order_id = ? OR order_name = ?`,
+      [String(order_id), String(order_id)]
     );
 
-    // 🔔 Send push
-    const cap = role.charAt(0).toUpperCase() + role.slice(1);
-   await sendWhatsAppToCustomer(order_id, '🎨 Design Completed! Order is now moved to Printing.');
-
+    // (optional) send WhatsApp here if you want; you had a call to sendWhatsAppToCustomer.
     res.json({ success: true });
   } catch (err) {
     console.error('Quick done error:', err);
@@ -321,26 +315,24 @@ app.post('/api/quick-done', async (req, res) => {
   }
 });
 
+
 app.get('/api/get-order/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    // Check order_name (Shopify short number with #)
     const shortName = `#${id}`;
-    const [rows] = await db.execute(
-    'SELECT * FROM order_progress WHERE order_name = ? OR order_id = ?',
-      [`#${id}`, id]
+    const [rows] = await pool.execute(
+      'SELECT * FROM order_progress WHERE order_name = ? OR order_id = ?',
+      [shortName, id]
     );
 
-    if (!rows.length) {
-      return res.json({ error: 'Order not found' });
-    }
-
+    if (!rows.length) return res.json({ error: 'Order not found' });
     res.json({ order: rows[0] });
   } catch (err) {
     console.error('Get-order error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
+
 
 app.get('/api/weekly-summary', async (req, res) => {
   try {

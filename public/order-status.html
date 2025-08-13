@@ -232,18 +232,33 @@ async function saveDispatchDate(orderId){
     });
     const d = await res.json();
     if(d && d.success){
+      // ✅ instant UI update so it won’t disappear
+      const idStr = String(orderId);
+      allOrders = allOrders.map(o =>
+        (String(o.order_id) === idStr || String(o.order_name) === idStr)
+          ? { ...o, dispatch_date: date }
+          : o
+      );
+      // reapply any filtering for current role
+      filteredOrders = (userRole && userRole.startsWith('design_user'))
+        ? allOrders.filter(o => o.design_assignee === username)
+        : [...allOrders];
+      renderTable();
+
+      // small visual cue
       inp.classList.add('date-saved');
       setTimeout(()=>inp.classList.remove('date-saved'), 1200);
-    }else{
-      alert('Failed to save dispatch date');
+    } else {
+      alert(d?.error || 'Failed to save dispatch date');
     }
-  }catch(e){
+  } catch(e){
     console.error(e);
     alert('Network error while saving date');
-  }finally{
+  } finally{
     inp.disabled = oldDisabled;
   }
 }
+
 
 /* ───────────── Fetch orders ───────────── */
 async function loadOrders() {

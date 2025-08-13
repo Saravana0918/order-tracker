@@ -17,6 +17,8 @@
     .btn-add        { border-radius:50px; }
     table.table-hover tbody tr.row-expired td {background-color: #f8d7da !important; color: #721c24 !important;}
     #homeBtn {position: fixed;bottom: 20px;right: 20px;z-index: 999;border-radius: 50px;padding: 10px 20px;display: none;}
+
+    /* KPI cards */
     .kpi-card{
       display:flex; align-items:center; gap:12px;
       padding:14px 16px; border-radius:14px; background:#fff;
@@ -24,19 +26,19 @@
       transition:.2s transform, .2s box-shadow;
     }
     .kpi-card:hover{ transform:translateY(-2px); box-shadow:0 10px 30px rgba(0,0,0,.08); }
-
     .kpi-icon{
       width:44px; height:44px; display:grid; place-items:center;
       border-radius:12px; color:#fff; font-size:18px; flex:0 0 44px;
     }
     .kpi-meta small{ color:#6b7280; font-weight:600; letter-spacing:.2px; }
     .kpi-meta h4{ margin:0; font-weight:700; color:#111827;font-family: 'Google Sans', Roboto, Arial, sans-serif; }
-
     .kpi-today  .kpi-icon{ background:linear-gradient(135deg,#22c55e,#16a34a);}
     .kpi-yday   .kpi-icon{ background:linear-gradient(135deg,#f59e0b,#d97706);}
     .kpi-week   .kpi-icon{ background:linear-gradient(135deg,#6366f1,#4f46e5);}
     .kpi-month  .kpi-icon{ background:linear-gradient(135deg,#06b6d4,#0891b2);}
 
+    /* Small visual for saved date */
+    .date-saved { outline: 2px solid #19875466; border-radius: 6px; }
   </style>
 </head>
 <body class="p-4">
@@ -58,40 +60,37 @@
            placeholder="Search Order ID…" onkeyup="filterOrders()">
   </div>
 
-<!-- DAILY ORDER COUNTS (Only admin/customer) -->
-<div id="dailyStatsWrapper" style="display:none;">
-  <div class="row g-3" id="dailyStats">
-    <!-- SAME KPI CARDS AS BEFORE -->
-    <div class="col-6 col-md-3">
-      <div class="kpi-card kpi-today">
-        <div class="kpi-icon"><i class="fa-solid fa-calendar-day"></i></div>
-        <div class="kpi-meta"><small>Today</small><h4 id="countToday">0</h4></div>
+  <!-- DAILY ORDER COUNTS (Only admin/customer) -->
+  <div id="dailyStatsWrapper" style="display:none;">
+    <div class="row g-3" id="dailyStats">
+      <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-today">
+          <div class="kpi-icon"><i class="fa-solid fa-calendar-day"></i></div>
+          <div class="kpi-meta"><small>Today</small><h4 id="countToday">0</h4></div>
+        </div>
       </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="kpi-card kpi-yday">
-        <div class="kpi-icon"><i class="fa-regular fa-calendar"></i></div>
-        <div class="kpi-meta"><small>Yesterday</small><h4 id="countYday">0</h4></div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-yday">
+          <div class="kpi-icon"><i class="fa-regular fa-calendar"></i></div>
+          <div class="kpi-meta"><small>Yesterday</small><h4 id="countYday">0</h4></div>
+        </div>
       </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="kpi-card kpi-week">
-        <div class="kpi-icon"><i class="fa-solid fa-chart-line"></i></div>
-        <div class="kpi-meta"><small>Last 7 Days</small><h4 id="count7">0</h4></div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-week">
+          <div class="kpi-icon"><i class="fa-solid fa-chart-line"></i></div>
+          <div class="kpi-meta"><small>Last 7 Days</small><h4 id="count7">0</h4></div>
+        </div>
       </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="kpi-card kpi-month">
-        <div class="kpi-icon"><i class="fa-regular fa-calendar-days"></i></div>
-        <div class="kpi-meta"><small>This Month</small><h4 id="countMonth">0</h4></div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-month">
+          <div class="kpi-icon"><i class="fa-regular fa-calendar-days"></i></div>
+          <div class="kpi-meta"><small>This Month</small><h4 id="countMonth">0</h4></div>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-
-
-     <button class="btn btn-primary" id="homeBtn">Home</button>
+  <button class="btn btn-primary" id="homeBtn">Home</button>
 
   <div id="summaryBox" style="display: none; margin-bottom: 20px;margin-top: 20px;">
     <label><strong>Select Date:</strong></label>
@@ -106,53 +105,51 @@
   </div>
   <div id="userOrdersContainer" class="mt-4"></div>
 
-<h4 class="mt-4 d-flex align-items-center justify-content-between">
-  Weekly Pending Summary (Last 7 Days)
-  <button class="btn btn-secondary btn-sm mb-2" onclick="loadWeeklyPendingTable()">Refresh</button>
-</h4>
+  <h4 class="mt-4 d-flex align-items-center justify-content-between">
+    Weekly Pending Summary (Last 7 Days)
+    <button class="btn btn-secondary btn-sm mb-2" onclick="loadWeeklyPendingTable()">Refresh</button>
+  </h4>
 
-<div id="weekly-summary-container" class="table-responsive">
-  <table class="table table-bordered text-center" id="weekly-summary-table">
-    <thead>
-      <tr id="weekly-summary-header"></tr>
-    </thead>
-    <tbody id="weekly-summary-body"></tbody>
-  </table>
-</div>
-
+  <div id="weekly-summary-container" class="table-responsive">
+    <table class="table table-bordered text-center" id="weekly-summary-table">
+      <thead>
+        <tr id="weekly-summary-header"></tr>
+      </thead>
+      <tbody id="weekly-summary-body"></tbody>
+    </table>
+  </div>
 
   <!-- ORDER TABLE -->
   <div class="card p-3" id="mainTableSection">
-  <div class="table-responsive">
-    <table class="table table-hover">
-      <thead class="table-light">
-        <tr id="theadRow"></tr>
-      </thead>
-      <tbody id="ordersTable"></tbody>
-    </table>
-    <div class="text-muted small mt-2" id="orderCount"></div>
+    <div class="table-responsive">
+      <table class="table table-hover">
+        <thead class="table-light">
+          <tr id="theadRow"></tr>
+        </thead>
+        <tbody id="ordersTable"></tbody>
+      </table>
+      <div class="text-muted small mt-2" id="orderCount"></div>
+    </div>
   </div>
 </div>
-</div>
-
 
 <script>
 /* ───────────── Config ───────────── */
 const stages = ['design','printing','fusing','stitching','shipping'];
 const allCols = [
   "order-id", "customer", "design", "design_assignee", "design_preview",
-  "printing", "fusing", "stitching", "shipping", "updated",
+  "printing", "fusing", "stitching", "shipping", "dispatch_date", "updated",
   "price", "fulfillment", "payment", "shiptype", "items", "tags", "address", "actions"
 ];
 
 const roleCols = {
-  admin:     ['order-id', 'customer', 'design', 'design_assignee', 'design_preview', 'printing', 'fusing', 'stitching', 'shipping', 'updated', 'actions'],
-  customer:  ['order-id', 'customer', 'design', 'design_assignee', 'design_preview', 'printing', 'fusing', 'stitching', 'shipping', 'updated', 'actions'],
-  design:    ['order-id', 'customer', 'design', 'updated', 'actions'],
-  printing:  ['order-id', 'customer', 'design_preview', 'updated', 'actions'],
-  fusing:    ['order-id', 'customer', 'design_preview', 'updated', 'actions'],
-  stitching: ['order-id', 'customer', 'design_preview', 'updated', 'actions'],
-  shipping:  ['order-id', 'customer', 'design_preview', 'updated', 'actions']
+  admin:     ['order-id','customer','design','design_assignee','design_preview','printing','fusing','stitching','shipping','dispatch_date','updated','actions'],
+  customer:  ['order-id','customer','design','design_assignee','design_preview','printing','fusing','stitching','shipping','dispatch_date','updated','actions'],
+  design:    ['order-id','customer','design','dispatch_date','updated','actions'],
+  printing:  ['order-id','customer','design_preview','dispatch_date','updated','actions'],
+  fusing:    ['order-id','customer','design_preview','dispatch_date','updated','actions'],
+  stitching: ['order-id','customer','design_preview','dispatch_date','updated','actions'],
+  shipping:  ['order-id','customer','design_preview','dispatch_date','updated','actions']
 };
 
 let userRole='', username='';
@@ -163,19 +160,13 @@ const homeBtn = document.getElementById('homeBtn');
 
 // Show button only when user scrolls a bit
 window.addEventListener('scroll', () => {
-  if (window.scrollY > 200) {
-    homeBtn.style.display = 'block';
-  } else {
-    homeBtn.style.display = 'none';
-  }
+  homeBtn.style.display = window.scrollY > 200 ? 'block' : 'none';
 });
 
 // Scroll to main table when clicked
 homeBtn.addEventListener('click', () => {
   const tableSection = document.getElementById('mainTableSection');
-  if (tableSection) {
-    tableSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+  if (tableSection) tableSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
 /* ───────────── Auth helpers ───────────── */
@@ -187,20 +178,18 @@ function checkLogin(){
   if(!username) location.href = '/login';
   document.getElementById('loggedUser').innerText = `${username} (${userRole})`;
 
-  // Show weekly performance only for admin & customer
+  // Cards + weekly perf only for admin & customer
+  const statsWrap = document.getElementById('dailyStatsWrapper');
   if (userRole === 'admin' || userRole === 'customer') {
     document.getElementById('weeklyPerformanceCard').style.display = 'block';
-    const statsWrap = document.getElementById('dailyStatsWrapper');
-    if (statsWrap) statsWrap.style.display = 'block';  // ✅ Show KPI cards
+    if (statsWrap) statsWrap.style.display = 'block';
   } else {
-    const statsWrap = document.getElementById('dailyStatsWrapper');
-    if (statsWrap) statsWrap.style.display = 'none';   // ❌ Hide KPI cards
+    if (statsWrap) statsWrap.style.display = 'none';
   }
 }
 
-
 function parseDateString(dateStr) {
-  return new Date(dateStr); // Works if dateStr is in valid SQL datetime format
+  return new Date(dateStr);
 }
 
 /* ───────────── Column visibility ───────────── */
@@ -213,6 +202,47 @@ function applyRoleVisibility(){
     if (th) th.style.display = dsp;
     tds.forEach(td=>td.style.display=dsp);
   });
+}
+
+/* ───────────── Date utils ───────────── */
+// Convert any date string to YYYY-MM-DD for <input type="date">
+function toInputDate(d){
+  if(!d) return '';
+  const x = new Date(d);
+  const y = x.getFullYear();
+  const m = String(x.getMonth()+1).padStart(2,'0');
+  const dd = String(x.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+
+/* ───────────── API: Save Dispatch Date ───────────── */
+async function saveDispatchDate(orderId){
+  const inp = document.querySelector(`input[data-disp="${orderId}"]`);
+  if(!inp) return;
+  const date = inp.value;
+  if(!date){ alert('Please choose a dispatch date'); return; }
+
+  const oldDisabled = inp.disabled; inp.disabled = true;
+
+  try{
+    const res = await fetch('/api/set-dispatch-date', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ order_id: orderId, dispatch_date: date })
+    });
+    const d = await res.json();
+    if(d && d.success){
+      inp.classList.add('date-saved');
+      setTimeout(()=>inp.classList.remove('date-saved'), 1200);
+    }else{
+      alert('Failed to save dispatch date');
+    }
+  }catch(e){
+    console.error(e);
+    alert('Network error while saving date');
+  }finally{
+    inp.disabled = oldDisabled;
+  }
 }
 
 /* ───────────── Fetch orders ───────────── */
@@ -239,31 +269,24 @@ async function loadOrders() {
 
   renderTable();
 
-  // 👇 Show daily counts ONLY for admin / customer
+  // Only admin/customer see counts
+  const statsWrap = document.getElementById('dailyStatsWrapper');
   if (userRole === 'admin' || userRole === 'customer') {
-    const statsWrap = document.getElementById('dailyStatsWrapper');
     if (statsWrap) statsWrap.style.display = 'block';
     renderDailyCounts(allOrders);
-  } else {
-    const statsWrap = document.getElementById('dailyStatsWrapper');
-    if (statsWrap) statsWrap.style.display = 'none';
+  } else if (statsWrap) {
+    statsWrap.style.display = 'none';
   }
 }
-
 
 async function loadWeeklySummary() {
   try {
     const res = await fetch('/api/weekly-summary');
     const data = await res.json();
-
-    if (!data || !data.users) {
-      console.error('No data received for weekly summary');
-      return;
-    }
+    if (!data || !data.users) return;
 
     const container = document.getElementById('userButtons');
     container.innerHTML = '';
-
     data.users.forEach(user => {
       const btn = document.createElement('button');
       btn.className = "btn btn-outline-primary btn-sm";
@@ -279,38 +302,29 @@ async function loadWeeklySummary() {
 // ------------------- Weekly Pending Table Loader -------------------
 async function loadWeeklyPendingTable() {
   try {
-    const res = await fetch('/api/weekly-summary-table'); // new endpoint
+    const res = await fetch('/api/weekly-summary-table');
     const data = await res.json();
-
     if (!data.length) return;
 
     const headerRow = document.getElementById('weekly-summary-header');
     const body = document.getElementById('weekly-summary-body');
 
-    // Clear previous table data
     headerRow.innerHTML = '';
     body.innerHTML = '';
 
-    // Get all columns from first row keys
-    const keys = Object.keys(data[0]); // e.g., ["date", "srikanth", "kushi", ...]
+    const keys = Object.keys(data[0]); // e.g., ["date", "srikanth", ...]
     headerRow.innerHTML = `<th>Date</th>` + keys.slice(1).map(k => `<th>${k}</th>`).join('');
 
-    // Fill rows
     data.forEach(row => {
       let rowHTML = `<td>${row.date}</td>`;
-      keys.slice(1).forEach(k => {
-        rowHTML += `<td>${row[k]}</td>`;
-      });
+      keys.slice(1).forEach(k => { rowHTML += `<td>${row[k]}</td>`; });
       body.innerHTML += `<tr>${rowHTML}</tr>`;
     });
   } catch (err) {
     console.error('Error loading weekly pending table:', err);
   }
 }
-
-// Load on page load
 document.addEventListener('DOMContentLoaded', loadWeeklyPendingTable);
-
 
 /* ───────────── Show User Orders ───────────── */
 async function showUserOrders(username) {
@@ -320,12 +334,11 @@ async function showUserOrders(username) {
   const res = await fetch(`/api/user-orders/${username}`);
   const data = await res.json();
 
-  if (data.orders.length === 0) {
+  if (!data.orders.length) {
     container.innerHTML = `<p>No pending orders for <b>${username}</b>.</p>`;
     return;
   }
 
-  // Build table
   let table = `
     <h5>Orders for ${username}</h5>
     <table class="table table-bordered table-hover">
@@ -339,7 +352,6 @@ async function showUserOrders(username) {
       </thead>
       <tbody>
   `;
-
   const now = new Date();
 
   data.orders.forEach(o => {
@@ -347,7 +359,6 @@ async function showUserOrders(username) {
     const diffHours = (now - updated) / (1000 * 60 * 60);
     const expiredClass = diffHours > 48 ? 'row-expired' : '';
 
-    // Use badge for status
     const statusBadge = o.status === 'Done'
       ? '<span class="badge bg-success">Done</span>'
       : '<span class="badge bg-warning text-dark">Pending</span>';
@@ -377,8 +388,6 @@ function filterOrders(){
 
 // ───────── Daily Counts ─────────
 function renderDailyCounts(orders){
-  // Helper: YYYY-MM-DD
-  // Local YYYY-MM-DD key (no UTC conversion)
   const dayKeyLocal = (d) => {
     const x = new Date(d);
     const y = x.getFullYear();
@@ -387,7 +396,6 @@ function renderDailyCounts(orders){
     return `${y}-${m}-${dd}`;
   };
 
-
   const today = new Date();
   const todayStr = dayKeyLocal(today);
 
@@ -395,25 +403,21 @@ function renderDailyCounts(orders){
   for (const o of orders){
     const d = o.created_at || o.createdAt || o.updated_at;
     if (!d) continue;
-    const key = dayKeyLocal(d);        // << here
+    const key = dayKeyLocal(d);
     byDay[key] = (byDay[key] || 0) + 1;
   }
 
-  // Today
   const cToday = byDay[todayStr] || 0;
 
-  // Yesterday
   const y = new Date(today); y.setDate(y.getDate()-1);
   const cYday = byDay[dayKeyLocal(y)] || 0; 
 
-  // Last 7 days (including today)
   let c7 = 0;
   for (let i=0;i<7;i++){
     const d = new Date(today); d.setDate(d.getDate()-i);
-    c7 += (byDay[dayKeyLocal(d)] || 0);       // << here
+    c7 += (byDay[dayKeyLocal(d)] || 0);
   }
 
-  // This month
   const mStart = new Date(today.getFullYear(), today.getMonth(), 1);
   let cMonth = 0;
   Object.keys(byDay).forEach(k=>{
@@ -421,16 +425,14 @@ function renderDailyCounts(orders){
     if (kd >= mStart && kd <= today) cMonth += byDay[k];
   });
 
-  // Update UI
   const tEl = document.getElementById('countToday');
-  if (!tEl) return; // if block hidden, skip
+  if (!tEl) return;
 
   tEl.textContent = cToday;
   document.getElementById('countYday').textContent  = cYday;
   document.getElementById('count7').textContent     = c7;
   document.getElementById('countMonth').textContent = cMonth;
 }
-
 
 /* ───────────── Assign designer ───────────── */
 async function assignDesigner(orderId){
@@ -469,7 +471,7 @@ async function quickDone(orderId) {
   const res = await fetch('/api/mark-stage-done', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ orderId, stage: userRole })  // stage = userRole like 'printing'
+    body: JSON.stringify({ orderId, stage: userRole })
   });
 
   const data = await res.json();
@@ -484,10 +486,11 @@ async function quickDone(orderId) {
 document.addEventListener('DOMContentLoaded', () => {
   const role = localStorage.getItem('role');
   if (role === 'admin' || role === 'customer') {
-  document.getElementById('summaryBox').style.display = 'block';
-}
+    document.getElementById('summaryBox').style.display = 'block';
+  }
 });
 
+/* ───────────── Fetch summary (existing) ───────────── */
 async function fetchSummary() {
   const date = document.getElementById('summaryDate').value;
   if (!date) return alert('Please select a date.');
@@ -499,17 +502,13 @@ async function fetchSummary() {
   });
 
   const data = await res.json();
-  if (data.error) {
-    alert('Error fetching summary.');
-    return;
-  }
+  if (data.error) { alert('Error fetching summary.'); return; }
 
   const design = Number(data.design_pending);
   const printing = Number(data.printing_pending);
   const fusing = Number(data.fusing_pending);
   const stitching = Number(data.stitching_pending);
   const shipping = Number(data.shipping_pending);
-
   const total = design + printing + fusing + stitching + shipping;
 
   document.getElementById('summaryResult').innerText =
@@ -557,6 +556,7 @@ function renderTable(){
   const visible = roleCols[userRole] || allCols;
   const now = new Date();
 
+  // Header
   visible.forEach(col=>{
     const th=document.createElement('th');
     th.setAttribute('data-column',col);
@@ -564,6 +564,7 @@ function renderTable(){
     thead.appendChild(th);
   });
 
+  // Rows
   filteredOrders.forEach(r=>{
     const tr=document.createElement('tr'); 
     let html='';
@@ -603,6 +604,21 @@ function renderTable(){
           ? `<img src="/uploads/design/${r.design_image}" style="max-width:90px;border:1px solid #ccc;cursor:pointer"
                  title="Click to enlarge" onclick="window.open('/uploads/design/${r.design_image}','_blank')">`
           : '-';
+      }
+      else if (col === 'dispatch_date') {
+        const current = toInputDate(r.dispatch_date);
+        if (userRole === 'admin' || userRole === 'customer'){
+          const t = toInputDate(new Date());
+          value = `
+            <div class="d-flex align-items-center gap-1">
+              <input type="date" class="form-control form-control-sm"
+                     data-disp="${r.order_id}" value="${current}" min="${t}">
+              <button class="btn btn-sm btn-outline-primary"
+                      onclick="saveDispatchDate('${r.order_id}')">Save</button>
+            </div>`;
+        } else {
+          value = current || '-';
+        }
       }
       else if(col==='updated') value = new Date(r.created_at).toLocaleString();
       else if(col==='actions'){

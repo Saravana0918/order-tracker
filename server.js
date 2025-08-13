@@ -81,6 +81,34 @@ app.post('/api/upload-design', upload.single('image'), async (req, res) => {
   }
 });
 
+// Save/Update dispatch date for an order
+app.post('/api/set-dispatch-date', async (req, res) => {
+  try {
+    const { order_id, dispatch_date } = req.body;
+    if (!order_id || !dispatch_date) {
+      return res.status(400).json({ success: false, error: 'Missing order_id or dispatch_date' });
+    }
+
+    // If you store orders in MySQL:
+    // Example table: orders(order_id VARCHAR, dispatch_date DATE, ...)
+    await pool.query(
+      'UPDATE orders SET dispatch_date = ? WHERE order_id = ?',
+      [dispatch_date, order_id]
+    );
+
+    // If order might not exist yet, you can upsert:
+    // await pool.query(
+    //   'INSERT INTO orders (order_id, dispatch_date) VALUES (?, ?) ON DUPLICATE KEY UPDATE dispatch_date = VALUES(dispatch_date)',
+    //   [order_id, dispatch_date]
+    // );
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('set-dispatch-date error:', err);
+    return res.status(500).json({ success: false, error: 'DB Error' });
+  }
+});
+
 /* -------- Assign designer -------- */
 app.post('/api/assign-designer', async (req, res) => {
   const { order_id, designer } = req.body;

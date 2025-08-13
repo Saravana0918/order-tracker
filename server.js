@@ -334,22 +334,38 @@ app.get('/api/get-order/:id', async (req, res) => {
 });
 
 // ---------------- DISPATCH SUMMARY TABLE (last 7 days) ----------------
+// ---------------- DISPATCH SUMMARY TABLE (last 7 days) ----------------
 app.get('/api/dispatch-summary-table', async (req, res) => {
   try {
     const today = new Date();
-    const results = [];
 
-    // get all designers
+    // All designers (for the columns you already show)
     const [designers] = await pool.query(`SELECT username FROM users WHERE role='design'`);
 
+    // Preload totals grouped by date in a single query (fast)
+    const [totals] = await pool.query(
+      `
+      SELECT DATE_FORMAT(dispatch_date, '%Y-%m-%d') AS d, COUNT(*) AS total
+      FROM order_progress
+      WHERE dispatch_date BETWEEN (CURDATE() - INTERVAL 6 DAY) AND CURDATE()
+      GROUP BY d
+      `
+    );
+    const totalMap = Object.fromEntries(totals.map(r => [r.d, r.total]));
+
+    const results = [];
+
     for (let i = 0; i < 7; i++) {
-      const d = new Date();
-      d.setDate(today.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0]; // yyyy-mm-dd
+      const dt = new Date();
+      dt.setDate(today.getDate() - i);
+      const dateStr = dt.toISOString().split('T')[0]; // yyyy-mm-dd
 
       const row = { date: dateStr };
 
-      // designer-wise count for that DISPATCH DATE
+      // ✅ Total scheduled to dispatch on that date
+      row.total = totalMap[dateStr] || 0;
+
+      // (Optional) keep your designer-wise columns
       for (const { username } of designers) {
         const [r] = await pool.query(
           `SELECT COUNT(*) AS cnt
@@ -361,14 +377,13 @@ app.get('/api/dispatch-summary-table', async (req, res) => {
         row[username] = r[0].cnt || 0;
       }
 
-      // stage-wise pending for that DISPATCH DATE
+      // (Optional) stage-wise pending for that dispatch date
       const stages = [
         { name: 'printing_user',  cond: 'design_done = 1 AND printing_done = 0' },
         { name: 'fusing_user',    cond: 'design_done = 1 AND printing_done = 1 AND fusing_done = 0' },
         { name: 'stitching_user', cond: 'design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 0' },
         { name: 'shipping_user',  cond: 'design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0' },
       ];
-
       for (const s of stages) {
         const [r] = await pool.query(
           `SELECT COUNT(*) AS cnt
@@ -389,6 +404,7 @@ app.get('/api/dispatch-summary-table', async (req, res) => {
     res.status(500).json({ error: 'DB Error' });
   }
 });
+
 
 
 app.get('/api/weekly-summary', async (req, res) => {

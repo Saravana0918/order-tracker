@@ -367,23 +367,24 @@ async function loadDispatchSummaryTable() {
     headerRow.innerHTML = '';
     body.innerHTML = '';
 
-    // Build columns from first row keys
-    const keys = Object.keys(data[0]); // ["date","srikanth","kushi",...,"printing_user",...]
-    headerRow.innerHTML = `<th>Date</th>` + keys.slice(1).map(k => `<th>${k}</th>`).join('');
+    // Ensure 'date' then 'total' first, followed by the rest (designers + stages)
+    const keys = Object.keys(data[0]);
+    const fixed = ['date', 'total'];
+    const others = keys.filter(k => !fixed.includes(k));
+    const cols = [...fixed, ...others];
 
-    // Rows
+    headerRow.innerHTML = cols.map(k => `<th>${k}</th>`).join('');
+
     for (const r of data) {
-      let tds = `<td>${r.date}</td>`;
-      for (const k of keys.slice(1)) tds += `<td>${r[k]}</td>`;
-      body.innerHTML += `<tr>${tds}</tr>`;
+      let rowHTML = '';
+      for (const k of cols) rowHTML += `<td>${r[k]}</td>`;
+      body.innerHTML += `<tr>${rowHTML}</tr>`;
     }
   } catch (e) {
     console.error('Error loading dispatch summary:', e);
   }
 }
 
-// auto-load with the others
-document.addEventListener('DOMContentLoaded', loadDispatchSummaryTable);
 
 
 /* ───────────── Show User Orders ───────────── */

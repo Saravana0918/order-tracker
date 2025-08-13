@@ -110,6 +110,15 @@
     <button class="btn btn-secondary btn-sm mb-2" onclick="loadWeeklyPendingTable()">Refresh</button>
   </h4>
 
+  <div id="weekly-summary-container" class="table-responsive">
+    <table class="table table-bordered text-center" id="weekly-summary-table">
+      <thead>
+        <tr id="weekly-summary-header"></tr>
+      </thead>
+      <tbody id="weekly-summary-body"></tbody>
+    </table>
+  </div>
+  
   <h4 class="mt-4 d-flex align-items-center justify-content-between">
   Dispatch Date Summary (Last 7 Days)
   <button class="btn btn-secondary btn-sm mb-2" onclick="loadDispatchSummaryTable()">Refresh</button>
@@ -123,14 +132,7 @@
 </div>
 
 
-  <div id="weekly-summary-container" class="table-responsive">
-    <table class="table table-bordered text-center" id="weekly-summary-table">
-      <thead>
-        <tr id="weekly-summary-header"></tr>
-      </thead>
-      <tbody id="weekly-summary-body"></tbody>
-    </table>
-  </div>
+
 
   <!-- ORDER TABLE -->
   <div class="card p-3" id="mainTableSection">
@@ -353,7 +355,6 @@ async function loadWeeklyPendingTable() {
   }
 }
 document.addEventListener('DOMContentLoaded', loadWeeklyPendingTable);
-
 
 async function loadDispatchSummaryTable() {
   try {

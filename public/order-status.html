@@ -358,26 +358,24 @@ document.addEventListener('DOMContentLoaded', loadWeeklyPendingTable);
 
 async function loadDispatchSummaryTable() {
   try {
-    const res = await fetch('/api/dispatch-summary-table');
+    const res = await fetch('/api/dispatch-summary-totals');  // 👈 new fast endpoint
     const data = await res.json();
     if (!Array.isArray(data) || !data.length) return;
 
     const headerRow = document.getElementById('dispatch-summary-header');
     const body      = document.getElementById('dispatch-summary-body');
 
-    // Show ONLY Date and Total
     headerRow.innerHTML = `<th>Date</th><th>Total</th>`;
     body.innerHTML = '';
 
     for (const r of data) {
-      const date  = r.date || '';
-      const total = Number(r.total || 0);
-      body.innerHTML += `<tr><td>${date}</td><td>${total}</td></tr>`;
+      body.innerHTML += `<tr><td>${r.date}</td><td>${r.total}</td></tr>`;
     }
   } catch (e) {
     console.error('Error loading dispatch summary:', e);
   }
 }
+
 
 /* ───────────── Show User Orders ───────────── */
 async function showUserOrders(username) {

@@ -82,30 +82,31 @@ app.post('/api/upload-design', upload.single('image'), async (req, res) => {
 });
 
 // Save/Update dispatch date for an order
+// Make sure this is after: app.use(express.json())
 app.post('/api/set-dispatch-date', async (req, res) => {
   try {
     const { order_id, dispatch_date } = req.body;
+
     if (!order_id || !dispatch_date) {
       return res.status(400).json({ success: false, error: 'Missing order_id or dispatch_date' });
     }
 
-    // If you store orders in MySQL:
-    // Example table: orders(order_id VARCHAR, dispatch_date DATE, ...)
-    await pool.query(
-      'UPDATE orders SET dispatch_date = ? WHERE order_id = ?',
-      [dispatch_date, order_id]
+    // Update the correct table: order_progress (NOT railway.orders)
+    // Some rows may be identified by order_name (e.g., "#19439"), so match either.
+    const [result] = await pool.query(
+      'UPDATE `order_progress` SET `dispatch_date` = ? WHERE `order_id` = ? OR `order_name` = ?',
+      [dispatch_date, String(order_id), String(order_id)]
     );
 
-    // If order might not exist yet, you can upsert:
-    // await pool.query(
-    //   'INSERT INTO orders (order_id, dispatch_date) VALUES (?, ?) ON DUPLICATE KEY UPDATE dispatch_date = VALUES(dispatch_date)',
-    //   [order_id, dispatch_date]
-    // );
+    if (result.affectedRows === 0) {
+      // Helpful message if the id didn’t match any row
+      return res.status(404).json({ success: false, error: 'Order not found in order_progress' });
+    }
 
     return res.json({ success: true });
   } catch (err) {
     console.error('set-dispatch-date error:', err);
-    return res.status(500).json({ success: false, error: 'DB Error' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

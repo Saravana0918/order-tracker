@@ -376,27 +376,31 @@ app.get('/api/dispatch-summary-upcoming', async (req, res) => {
 
     // Aggregate in one scan for the whole 7-day window
     const [agg] = await pool.query(`
-      SELECT
-        DATE_FORMAT(dispatch_date, '%Y-%m-%d') AS date,
-        COUNT(*) AS total,
+  SELECT
+    DATE_FORMAT(dispatch_date, '%Y-%m-%d') AS date,
+    COUNT(*) AS total,
 
-        -- per-designer counts (edit names if needed)
-        SUM(CASE WHEN design_assignee = 'srikanth'   THEN 1 ELSE 0 END) AS srikanth,
-        SUM(CASE WHEN design_assignee = 'kushi'      THEN 1 ELSE 0 END) AS kushi,
-        SUM(CASE WHEN design_assignee = 'shravanthi' THEN 1 ELSE 0 END) AS shravanthi,
-        SUM(CASE WHEN design_assignee = 'mahesh'     THEN 1 ELSE 0 END) AS mahesh,
-        SUM(CASE WHEN design_assignee = 'pawan'      THEN 1 ELSE 0 END) AS pawan,
+    -- per-designer (edit names if needed)
+    SUM(CASE WHEN design_assignee = 'srikanth'   THEN 1 ELSE 0 END) AS srikanth,
+    SUM(CASE WHEN design_assignee = 'kushi'      THEN 1 ELSE 0 END) AS kushi,
+    SUM(CASE WHEN design_assignee = 'shravanthi' THEN 1 ELSE 0 END) AS shravanthi,
+    SUM(CASE WHEN design_assignee = 'mahesh'     THEN 1 ELSE 0 END) AS mahesh,
+    SUM(CASE WHEN design_assignee = 'pawan'      THEN 1 ELSE 0 END) AS pawan,
 
-        -- stage-wise pending on that dispatch date
-        SUM(CASE WHEN design_done=1 AND printing_done=0 THEN 1 ELSE 0 END) AS printing_user,
-        SUM(CASE WHEN design_done=1 AND printing_done=1 AND fusing_done=0 THEN 1 ELSE 0 END) AS fusing_user,
-        SUM(CASE WHEN design_done=1 AND printing_done=1 AND fusing_done=1 AND stitching_done=0 THEN 1 ELSE 0 END) AS stitching_user,
-        SUM(CASE WHEN design_done=1 AND printing_done=1 AND fusing_done=1 AND stitching_done=1 AND shipping_done=0 THEN 1 ELSE 0 END) AS shipping_user
+    -- stage-wise pending for that dispatch date
+    SUM(CASE WHEN design_done=1 AND printing_done=0 THEN 1 ELSE 0 END) AS printing_user,
+    SUM(CASE WHEN design_done=1 AND printing_done=1 AND fusing_done=0 THEN 1 ELSE 0 END) AS fusing_user,
+    SUM(CASE WHEN design_done=1 AND printing_done=1 AND fusing_done=1 AND stitching_done=0 THEN 1 ELSE 0 END) AS stitching_user,
+    SUM(CASE WHEN design_done=1 AND printing_done=1 AND fusing_done=1 AND stitching_done=1 AND shipping_done=0 THEN 1 ELSE 0 END) AS shipping_user
 
-      FROM order_progress
-      WHERE dispatch_date BETWEEN CURDATE() AND (CURDATE() + INTERVAL 6 DAY)
-      GROUP BY DATE(dispatch_date)
-    `);
+  FROM order_progress
+  WHERE dispatch_date BETWEEN CURDATE() AND (CURDATE() + INTERVAL 6 DAY)
+
+  -- 👇 use the exact same expression as in SELECT
+  GROUP BY DATE_FORMAT(dispatch_date, '%Y-%m-%d')
+  ORDER BY DATE_FORMAT(dispatch_date, '%Y-%m-%d') ASC
+`);
+
 
     // Map and fill zeros for days without records
     const map = Object.fromEntries(agg.map(r => [r.date, r]));

@@ -361,6 +361,67 @@ app.get('/api/dispatch-summary-totals', async (req, res) => {
   }
 });
 
+// ---------------- DISPATCH SUMMARY (UPCOMING 7 DAYS) ----------------
+app.get('/api/dispatch-summary-upcoming', async (req, res) => {
+  try {
+    // Build 7-day calendar (today .. +6)
+    const [calendar] = await pool.query(`
+      SELECT DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL seq DAY), '%Y-%m-%d') AS date
+      FROM (
+        SELECT 0 AS seq UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL
+        SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6
+      ) AS days
+      ORDER BY seq
+    `);
+
+    // Aggregate in one scan for the whole 7-day window
+    const [agg] = await pool.query(`
+      SELECT
+        DATE_FORMAT(dispatch_date, '%Y-%m-%d') AS date,
+        COUNT(*) AS total,
+
+        -- per-designer counts (edit names if needed)
+        SUM(CASE WHEN design_assignee = 'srikanth'   THEN 1 ELSE 0 END) AS srikanth,
+        SUM(CASE WHEN design_assignee = 'kushi'      THEN 1 ELSE 0 END) AS kushi,
+        SUM(CASE WHEN design_assignee = 'shravanthi' THEN 1 ELSE 0 END) AS shravanthi,
+        SUM(CASE WHEN design_assignee = 'mahesh'     THEN 1 ELSE 0 END) AS mahesh,
+        SUM(CASE WHEN design_assignee = 'pawan'      THEN 1 ELSE 0 END) AS pawan,
+
+        -- stage-wise pending on that dispatch date
+        SUM(CASE WHEN design_done=1 AND printing_done=0 THEN 1 ELSE 0 END) AS printing_user,
+        SUM(CASE WHEN design_done=1 AND printing_done=1 AND fusing_done=0 THEN 1 ELSE 0 END) AS fusing_user,
+        SUM(CASE WHEN design_done=1 AND printing_done=1 AND fusing_done=1 AND stitching_done=0 THEN 1 ELSE 0 END) AS stitching_user,
+        SUM(CASE WHEN design_done=1 AND printing_done=1 AND fusing_done=1 AND stitching_done=1 AND shipping_done=0 THEN 1 ELSE 0 END) AS shipping_user
+
+      FROM order_progress
+      WHERE dispatch_date BETWEEN CURDATE() AND (CURDATE() + INTERVAL 6 DAY)
+      GROUP BY DATE(dispatch_date)
+    `);
+
+    // Map and fill zeros for days without records
+    const map = Object.fromEntries(agg.map(r => [r.date, r]));
+    const rows = calendar.map(c => ({
+      date: c.date,
+      total: Number(map[c.date]?.total || 0),
+      srikanth:   Number(map[c.date]?.srikanth   || 0),
+      kushi:      Number(map[c.date]?.kushi      || 0),
+      shravanthi: Number(map[c.date]?.shravanthi || 0),
+      mahesh:     Number(map[c.date]?.mahesh     || 0),
+      pawan:      Number(map[c.date]?.pawan      || 0),
+      printing_user:  Number(map[c.date]?.printing_user  || 0),
+      fusing_user:    Number(map[c.date]?.fusing_user    || 0),
+      stitching_user: Number(map[c.date]?.stitching_user || 0),
+      shipping_user:  Number(map[c.date]?.shipping_user  || 0),
+    }));
+
+    res.json(rows);
+  } catch (err) {
+    console.error('Dispatch upcoming summary error:', err);
+    res.status(500).json({ error: 'DB Error' });
+  }
+});
+
+
 app.get('/api/weekly-summary', async (req, res) => {
   try {
     const [users] = await pool.query(

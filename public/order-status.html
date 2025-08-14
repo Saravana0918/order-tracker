@@ -119,15 +119,15 @@
     </table>
   </div>
   
-  <h4 class="mt-4 d-flex align-items-center justify-content-between">
-  Dispatch Date Summary (Last 7 Days)
-  <button class="btn btn-secondary btn-sm mb-2" onclick="loadDispatchSummaryTable()">Refresh</button>
+<h4 class="mt-4 d-flex align-items-center justify-content-between">
+  Dispatch Summary (Next 7 Days)
+  <button class="btn btn-secondary btn-sm mb-2" onclick="loadDispatchUpcomingTable()">Refresh</button>
 </h4>
 
 <div class="table-responsive">
-  <table class="table table-bordered text-center" id="dispatch-summary-table">
-    <thead><tr id="dispatch-summary-header"></tr></thead>
-    <tbody id="dispatch-summary-body"></tbody>
+  <table class="table table-bordered text-center">
+    <thead><tr id="dispatch-up-header"></tr></thead>
+    <tbody id="dispatch-up-body"></tbody>
   </table>
 </div>
 
@@ -259,6 +259,7 @@ async function saveDispatchDate(orderId){
         ? allOrders.filter(o => o.design_assignee === username)
         : [...allOrders];
       renderTable();
+      loadDispatchUpcomingTable();
 
       // small visual cue
       inp.classList.add('date-saved');
@@ -273,6 +274,39 @@ async function saveDispatchDate(orderId){
     inp.disabled = oldDisabled;
   }
 }
+
+async function loadDispatchUpcomingTable() {
+  try {
+    const res = await fetch('/api/dispatch-summary-upcoming');
+    const data = await res.json();
+    if (!data?.length) return;
+
+    const header = document.getElementById('dispatch-up-header');
+    const body   = document.getElementById('dispatch-up-body');
+
+    // Columns exactly like Weekly Summary
+    const cols = [
+      'date', 'srikanth', 'kushi', 'shravanthi', 'mahesh', 'pawan',
+      'printing_user', 'fusing_user', 'stitching_user', 'shipping_user', 'total'
+    ];
+
+    header.innerHTML = cols.map(c => `<th>${c}</th>`).join('');
+    body.innerHTML = '';
+
+    data.forEach(r => {
+      const tds = cols.map(k => `<td>${r[k] ?? 0}</td>`).join('');
+      body.innerHTML += `<tr>${tds}</tr>`;
+    });
+  } catch (e) {
+    console.error('loadDispatchUpcomingTable error:', e);
+  }
+}
+
+// load on page load with others
+document.addEventListener('DOMContentLoaded', () => {
+  loadDispatchUpcomingTable();
+});
+
 
 
 /* ───────────── Fetch orders ───────────── */
@@ -496,7 +530,7 @@ async function assignDesigner(orderId){
     body:JSON.stringify({ order_id:orderId, designer })
   });
   const data = await res.json();
-  if(data.success){ alert('Assigned successfully!'); await loadOrders(); }
+  if(data.success){ alert('Assigned successfully!'); await loadOrders();loadDispatchUpcomingTable(); }
   else alert('Assignment failed');
 }
 
@@ -529,6 +563,7 @@ async function quickDone(orderId) {
   if (data.success) {
     alert('Marked as Done!');
     await loadOrders();
+    loadDispatchUpcomingTable();
   } else {
     alert('Failed to update. Please try again.');
   }

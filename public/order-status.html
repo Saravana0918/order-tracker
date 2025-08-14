@@ -221,6 +221,17 @@ function parseDateString(dateStr) {
   return new Date(dateStr);
 }
 
+function isReadyForDesign(o) {
+  // hide when BOTH are set
+  return Boolean(o.dispatch_date) && Boolean(o.design_assignee);
+}
+
+function baseCustomerFilter(list) {
+  // for customer: show only NOT-ready orders
+  if (userRole === 'customer') return list.filter(o => !isReadyForDesign(o));
+  return list;
+}
+
 /* ───────────── Column visibility ───────────── */
 function applyRoleVisibility(){
   const visible = roleCols[userRole] || allCols;
@@ -244,15 +255,16 @@ function toInputDate(d){
 }
 
 /* ───────────── API: Save Dispatch Date ───────────── */
+// Save Dispatch Date (search-aware + customer auto-hide when both set)
 async function saveDispatchDate(orderId){
-  // ✅ match the rendered attribute name
   const inp = document.querySelector(`input[data-dispatch-input="${orderId}"]`);
   if(!inp) return alert('Date input not found for this row.');
 
-  const date = (inp.value || '').trim();          // type="date" gives yyyy-mm-dd
+  const date = (inp.value || '').trim();   // yyyy-mm-dd from <input type="date">
   if(!date){ alert('Please choose a dispatch date'); return; }
 
-  const oldDisabled = inp.disabled; inp.disabled = true;
+  const prevDisabled = inp.disabled; 
+  inp.disabled = true;
 
   try{
     const res = await fetch('/api/set-dispatch-date', {
@@ -262,9 +274,8 @@ async function saveDispatchDate(orderId){
     });
     const d = await res.json();
 
-    // ✅ accept either {success:true} OR {ok:true}
     if (res.ok && (d.success || d.ok)) {
-      // update local cache so UI immediately reflects saved date
+      // update local cache
       const idStr = String(orderId);
       allOrders = allOrders.map(o =>
         (String(o.order_id) === idStr || String(o.order_name) === idStr)
@@ -272,15 +283,29 @@ async function saveDispatchDate(orderId){
           : o
       );
 
-      // re-filter and re-render
-      filteredOrders = (userRole && userRole.startsWith('design_user'))
-        ? allOrders.filter(o => o.design_assignee === username)
-        : [...allOrders];
+      // recompute filtered view:
+      // - if searching → show matches from ALL orders (even hidden ones)
+      // - else:
+      //   * design_user → only their orders
+      //   * customer    → hide orders that have BOTH date & assignee
+      //   * others      → show all
+      const q = (document.getElementById('searchInput')?.value || '').trim();
+      if (q) {
+        filterOrders(); // your search already looks at allOrders
+      } else {
+        if (userRole && userRole.startsWith('design_user')) {
+          filteredOrders = allOrders.filter(o => o.design_assignee === username);
+        } else if (userRole === 'customer') {
+          filteredOrders = allOrders.filter(o => !(o.dispatch_date && o.design_assignee));
+        } else {
+          filteredOrders = [...allOrders];
+        }
+        renderTable();
+      }
 
-      renderTable();
-      loadDispatchUpcomingTable();  // refresh the Next 7 Days table
+      loadDispatchUpcomingTable();
 
-      // small visual cue
+      // visual cue
       inp.classList.add('date-saved');
       setTimeout(()=> inp.classList.remove('date-saved'), 1200);
     } else {
@@ -290,9 +315,10 @@ async function saveDispatchDate(orderId){
     console.error(e);
     alert('Network error while saving date');
   } finally{
-    inp.disabled = oldDisabled;
+    inp.disabled = prevDisabled;
   }
 }
+
 
 
 async function loadDispatchUpcomingTable() {
@@ -346,9 +372,10 @@ async function loadOrders() {
   allOrders = data.orders || [];
 
   if (userRole && userRole.startsWith('design_user')) {
-    filteredOrders = allOrders.filter(o => o.design_assignee === username);
+  filteredOrders = allOrders.filter(o => o.design_assignee === username);
   } else {
-    filteredOrders = [...allOrders];
+    // 👇 customer hides “ready” orders by default
+    filteredOrders = baseCustomerFilter(allOrders);
   }
 
   renderTable();
@@ -484,10 +511,22 @@ async function showUserOrders(username) {
 /* ───────────── Search filter ───────────── */
 function filterOrders(){
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
-  filteredOrders = allOrders.filter(o=>{
-    const oid = (o.order_name || o.order_id || '').toString().toLowerCase();
-    return oid.includes(q);
-  });
+
+  if (!q) {
+    // no query → apply base (role-aware) filter
+    if (userRole && userRole.startsWith('design_user')) {
+      filteredOrders = allOrders.filter(o => o.design_assignee === username);
+    } else {
+      filteredOrders = baseCustomerFilter(allOrders);
+    }
+  } else {
+    // query present → search across ALL orders (even hidden ones)
+    filteredOrders = allOrders.filter(o=>{
+      const oid = (o.order_name || o.order_id || '').toString().toLowerCase();
+      return oid.includes(q);
+    });
+  }
+
   renderTable();
 }
 
@@ -540,19 +579,51 @@ function renderDailyCounts(orders){
 }
 
 /* ───────────── Assign designer ───────────── */
+// Assign / Reassign Designer (instant UI + customer auto-hide + search-aware)
 async function assignDesigner(orderId){
   const select   = document.querySelector(`select[data-order-id="${orderId}"]`);
-  const designer = select.value;
+  const designer = select?.value;
   if(!designer){ alert("Pick a designer first"); return; }
 
-  const res  = await fetch('/api/assign-designer',{
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ order_id:orderId, designer })
+  const res  = await fetch('/api/assign-designer', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ order_id: orderId, designer })
   });
   const data = await res.json();
-  if(data.success){ alert('Assigned successfully!'); await loadOrders();loadDispatchUpcomingTable(); }
-  else alert('Assignment failed');
+
+  if (res.ok && data.success){
+    alert('Assigned successfully!');
+
+    // update local cache (no full reload)
+    const idStr = String(orderId);
+    allOrders = allOrders.map(o =>
+      (String(o.order_id) === idStr || String(o.order_name) === idStr)
+        ? { ...o, design_assignee: designer }
+        : o
+    );
+
+    // same recompute rules as saveDispatchDate()
+    const q = (document.getElementById('searchInput')?.value || '').trim();
+    if (q) {
+      filterOrders();
+    } else {
+      if (userRole && userRole.startsWith('design_user')) {
+        filteredOrders = allOrders.filter(o => o.design_assignee === username);
+      } else if (userRole === 'customer') {
+        filteredOrders = allOrders.filter(o => !(o.dispatch_date && o.design_assignee));
+      } else {
+        filteredOrders = [...allOrders];
+      }
+      renderTable();
+    }
+
+    loadDispatchUpcomingTable();
+  } else {
+    alert(data?.error || 'Assignment failed');
+  }
 }
+
 
 /* ───────────── Preview & upload helper ───────────── */
 function preview(id){

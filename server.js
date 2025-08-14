@@ -220,89 +220,86 @@ app.get('/api/orders', async (req, res) => {
 // Sync Shopify orders → DB (Upsert + correct quantities)
 app.post('/api/sync-orders', async (req, res) => {
   try {
-    // 1) Fetch orders from Shopify
     const url = `https://${SHOPIFY_STORE}/admin/api/2023-10/orders.json`;
-    const { data } = await axios.get(url, {
+    const shopifyRes = await axios.get(url, {
       headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_API_TOKEN },
-      params: {
-        status: 'any',
-        limit: 50,                     // pull latest 50; raise to 250 if you like
-        order: 'created_at desc'
-      }
+      params: { status: 'any', limit: 50 }   // old style, same as before
     });
 
     let imported = 0;
     let updated  = 0;
 
-    // 2) Prepare rows
-    const rows = (data?.orders || []).map((o) => {
-      const totalQty = (o.line_items || []).reduce((sum, li) => sum + (li.quantity || 0), 0);
-
-      const customerName = `${o.customer?.first_name || ''} ${o.customer?.last_name || ''}`.trim();
-      const address = o.shipping_address
+    for (const o of (shopifyRes.data?.orders || [])) {
+      const orderId   = o.id.toString();
+      const totalQty  = (o.line_items || []).reduce((n, li) => n + (li.quantity || 0), 0);
+      const customer  = `${o.customer?.first_name || ''} ${o.customer?.last_name || ''}`.trim();
+      const address   = o.shipping_address
         ? `${o.shipping_address.address1 || ''}, ${o.shipping_address.city || ''}, ${o.shipping_address.province || ''}, ${o.shipping_address.country || ''}, ${o.shipping_address.zip || ''}`
         : '';
+      const createdAt = new Date(o.created_at);
+      const updatedAt = new Date(o.updated_at);
 
-      // Use the exact Shopify timestamps; fall back to now for safety
-      const createdTs = o.created_at ? new Date(o.created_at) : new Date();
-      const updatedTs = o.updated_at ? new Date(o.updated_at) : new Date();
+      const [[row]] = await pool.query(
+        'SELECT 1 FROM order_progress WHERE order_id = ? LIMIT 1',
+        [orderId]
+      );
 
-      return [
-        o.id.toString(),                // order_id (UNIQUE)
-        o.name || '',                   // order_name
-        customerName,                   // customer_name
-        Number(o.total_price || 0),     // total_price
-        o.fulfillment_status || '',     // fulfillment_status
-        o.financial_status || '',       // payment_status
-        (o.shipping_lines?.[0]?.title) || '', // shipping_method
-        Number(totalQty || 0),          // item_count (THIS IS QUANTITY)
-        o.tags || '',                   // tags
-        address,                        // address
-        createdTs,                      // created_at
-        updatedTs                       // updated_at
-      ];
-    });
-
-    if (rows.length === 0) {
-      return res.json({ success: true, imported: 0, updated: 0 });
+      if (!row) {
+        await pool.execute(
+          `INSERT INTO order_progress (
+             order_id, order_name, customer_name,
+             total_price, fulfillment_status, payment_status,
+             shipping_method, item_count, tags, address,
+             created_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            orderId, o.name, customer,
+            o.total_price || 0,
+            o.fulfillment_status || '',
+            o.financial_status || '',
+            o.shipping_lines?.[0]?.title || '',
+            totalQty,
+            o.tags || '',
+            address,
+            createdAt,
+            updatedAt
+          ]
+        );
+        imported++;
+      } else {
+        await pool.execute(
+          `UPDATE order_progress
+             SET order_name         = ?,
+                 customer_name      = ?,
+                 total_price        = ?,
+                 fulfillment_status = ?,
+                 payment_status     = ?,
+                 shipping_method    = ?,
+                 item_count         = ?,
+                 tags               = ?,
+                 address            = ?,
+                 updated_at         = ?
+           WHERE order_id = ?`,
+          [
+            o.name, customer,
+            o.total_price || 0,
+            o.fulfillment_status || '',
+            o.financial_status || '',
+            o.shipping_lines?.[0]?.title || '',
+            totalQty,
+            o.tags || '',
+            address,
+            updatedAt,
+            orderId
+          ]
+        );
+        updated++;
+      }
     }
 
-    // 3) Upsert all rows in one shot
-    //    Needs UNIQUE KEY on order_id (uk_order_id)
-    const sql = `
-      INSERT INTO order_progress (
-        order_id, order_name, customer_name,
-        total_price, fulfillment_status, payment_status,
-        shipping_method, item_count, tags, address,
-        created_at, updated_at
-      )
-      VALUES ?
-      ON DUPLICATE KEY UPDATE
-        order_name         = VALUES(order_name),
-        customer_name      = VALUES(customer_name),
-        total_price        = VALUES(total_price),
-        fulfillment_status = VALUES(fulfillment_status),
-        payment_status     = VALUES(payment_status),
-        shipping_method    = VALUES(shipping_method),
-        item_count         = VALUES(item_count),      -- keep quantities in sync
-        tags               = VALUES(tags),
-        address            = VALUES(address),
-        updated_at         = VALUES(updated_at)
-    `;
-
-    const [result] = await pool.query(sql, [rows]);
-
-    // INSERT ... ON DUPLICATE KEY UPDATE reporting:
-    // affectedRows = inserted_rows*1 + updated_rows*2
-    // insertId etc. are not useful here. We can estimate like this:
-    const affected = result.affectedRows || 0;
-    // updated rows contribute 2, the rest are inserts
-    updated  = Math.max(0, affected - rows.length);
-    imported = rows.length - (updated / 2);
-
-    res.json({ success: true, imported, updated: updated / 2 });
+    res.json({ success: true, imported, updated });
   } catch (err) {
-    console.error('Sync error:', err?.response?.data || err.message || err);
+    console.error('Sync error:', err);
     res.status(500).json({ success: false, error: 'Shopify sync failed' });
   }
 });

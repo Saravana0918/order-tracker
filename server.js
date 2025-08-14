@@ -217,62 +217,96 @@ app.get('/api/orders', async (req, res) => {
 
 
 /* -------- Sync Shopify Orders (Manual Refresh) -------- */
+// Sync Shopify orders → DB (Upsert + correct quantities)
 app.post('/api/sync-orders', async (req, res) => {
   try {
-    const shopifyRes = await axios.get(
-      `https://${SHOPIFY_STORE}/admin/api/2023-10/orders.json`,
-      {
-        headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_API_TOKEN },
-        params: { status: 'any', limit: 50 }
+    // 1) Fetch orders from Shopify
+    const url = `https://${SHOPIFY_STORE}/admin/api/2023-10/orders.json`;
+    const { data } = await axios.get(url, {
+      headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_API_TOKEN },
+      params: {
+        status: 'any',
+        limit: 50,                     // pull latest 50; raise to 250 if you like
+        order: 'created_at desc'
       }
-    );
+    });
 
     let imported = 0;
+    let updated  = 0;
 
-    for (const o of shopifyRes.data.orders) {
-      const orderId = o.id.toString();
-      const [exists] = await pool.execute(
-        'SELECT 1 FROM order_progress WHERE order_id = ?',
-        [orderId]
-      );
+    // 2) Prepare rows
+    const rows = (data?.orders || []).map((o) => {
+      const totalQty = (o.line_items || []).reduce((sum, li) => sum + (li.quantity || 0), 0);
 
       const customerName = `${o.customer?.first_name || ''} ${o.customer?.last_name || ''}`.trim();
       const address = o.shipping_address
         ? `${o.shipping_address.address1 || ''}, ${o.shipping_address.city || ''}, ${o.shipping_address.province || ''}, ${o.shipping_address.country || ''}, ${o.shipping_address.zip || ''}`
         : '';
 
-      if (!exists.length) {
-        const shopifyCreatedAt = new Date(o.created_at);
+      // Use the exact Shopify timestamps; fall back to now for safety
+      const createdTs = o.created_at ? new Date(o.created_at) : new Date();
+      const updatedTs = o.updated_at ? new Date(o.updated_at) : new Date();
 
-        await pool.execute(
-          `INSERT INTO order_progress (
-            order_id, order_name, customer_name,
-            total_price, fulfillment_status, payment_status,
-            shipping_method, item_count, tags, address, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            orderId, o.name, customerName,
-            o.total_price || 0,
-            o.fulfillment_status || '',
-            o.financial_status || '',
-            o.shipping_lines?.[0]?.title || '',
-            o.line_items?.length || 0,
-            o.tags || '',
-            address,
-            shopifyCreatedAt,
-            shopifyCreatedAt
-          ]
-        );
-        imported++;
-      }
+      return [
+        o.id.toString(),                // order_id (UNIQUE)
+        o.name || '',                   // order_name
+        customerName,                   // customer_name
+        Number(o.total_price || 0),     // total_price
+        o.fulfillment_status || '',     // fulfillment_status
+        o.financial_status || '',       // payment_status
+        (o.shipping_lines?.[0]?.title) || '', // shipping_method
+        Number(totalQty || 0),          // item_count (THIS IS QUANTITY)
+        o.tags || '',                   // tags
+        address,                        // address
+        createdTs,                      // created_at
+        updatedTs                       // updated_at
+      ];
+    });
+
+    if (rows.length === 0) {
+      return res.json({ success: true, imported: 0, updated: 0 });
     }
 
-    res.json({ success: true, imported });
+    // 3) Upsert all rows in one shot
+    //    Needs UNIQUE KEY on order_id (uk_order_id)
+    const sql = `
+      INSERT INTO order_progress (
+        order_id, order_name, customer_name,
+        total_price, fulfillment_status, payment_status,
+        shipping_method, item_count, tags, address,
+        created_at, updated_at
+      )
+      VALUES ?
+      ON DUPLICATE KEY UPDATE
+        order_name         = VALUES(order_name),
+        customer_name      = VALUES(customer_name),
+        total_price        = VALUES(total_price),
+        fulfillment_status = VALUES(fulfillment_status),
+        payment_status     = VALUES(payment_status),
+        shipping_method    = VALUES(shipping_method),
+        item_count         = VALUES(item_count),      -- keep quantities in sync
+        tags               = VALUES(tags),
+        address            = VALUES(address),
+        updated_at         = VALUES(updated_at)
+    `;
+
+    const [result] = await pool.query(sql, [rows]);
+
+    // INSERT ... ON DUPLICATE KEY UPDATE reporting:
+    // affectedRows = inserted_rows*1 + updated_rows*2
+    // insertId etc. are not useful here. We can estimate like this:
+    const affected = result.affectedRows || 0;
+    // updated rows contribute 2, the rest are inserts
+    updated  = Math.max(0, affected - rows.length);
+    imported = rows.length - (updated / 2);
+
+    res.json({ success: true, imported, updated: updated / 2 });
   } catch (err) {
-    console.error('Sync error:', err);
+    console.error('Sync error:', err?.response?.data || err.message || err);
     res.status(500).json({ success: false, error: 'Shopify sync failed' });
   }
 });
+
 
 
 /* -------- Login -------- */
@@ -436,79 +470,62 @@ app.get('/api/dispatch-summary-upcoming', async (req, res) => {
 
 app.get('/api/order-metrics', async (req, res) => {
   try {
+    // local now in IST using CONVERT_TZ on the DB
     const [rows] = await pool.query(`
-      SELECT
-        /* Local time */
-        DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) AS d,
-        YEAR(CONVERT_TZ(created_at, '+00:00', '+05:30'))  AS y,
-        MONTH(CONVERT_TZ(created_at, '+00:00', '+05:30')) AS m,
-        COUNT(*) AS c,
-        SUM(item_count) AS q
+      /* Today (IST) */
+      SELECT 'today' AS k,
+             COUNT(*) AS c,
+             COALESCE(SUM(COALESCE(item_count,0)),0) AS q
       FROM order_progress
-      WHERE created_at >= (UTC_TIMESTAMP() - INTERVAL 40 DAY) /* small window is enough */
-      GROUP BY d, y, m
+      WHERE DATE(CONVERT_TZ(created_at,'+00:00','+05:30')) =
+            DATE(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+05:30'))
+
+      UNION ALL
+
+      /* Yesterday (IST) */
+      SELECT 'yesterday' AS k,
+             COUNT(*) AS c,
+             COALESCE(SUM(COALESCE(item_count,0)),0) AS q
+      FROM order_progress
+      WHERE DATE(CONVERT_TZ(created_at,'+00:00','+05:30')) =
+            DATE_SUB(DATE(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+05:30')), INTERVAL 1 DAY)
+
+      UNION ALL
+
+      /* Last 7 days incl. today (IST) */
+      SELECT 'last7' AS k,
+             COUNT(*) AS c,
+             COALESCE(SUM(COALESCE(item_count,0)),0) AS q
+      FROM order_progress
+      WHERE DATE(CONVERT_TZ(created_at,'+00:00','+05:30'))
+            BETWEEN DATE_SUB(DATE(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+05:30')), INTERVAL 6 DAY)
+                AND DATE(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+05:30'))
+
+      UNION ALL
+
+      /* This month (IST) */
+      SELECT 'month' AS k,
+             COUNT(*) AS c,
+             COALESCE(SUM(COALESCE(item_count,0)),0) AS q
+      FROM order_progress
+      WHERE YEAR(CONVERT_TZ(created_at,'+00:00','+05:30')) =
+            YEAR(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+05:30'))
+        AND MONTH(CONVERT_TZ(created_at,'+00:00','+05:30')) =
+            MONTH(CONVERT_TZ(UTC_TIMESTAMP(),'+00:00','+05:30'));
     `);
 
-    const today = new Date();
-    const istTodayStr = new Date(today.getTime() + (5.5*60*60*1000))
-      .toISOString().slice(0,10); // yyyy-mm-dd in IST roughly (good enough here)
-
-    // helper to yyyy-mm-dd local (IST) for comparisons
-    const dayKey = (dt) => {
-      const x = new Date(dt.getTime() + (5.5*60*60*1000));
-      return x.toISOString().slice(0,10);
-    };
-
-    const yday = new Date(today); yday.setDate(yday.getDate()-1);
-    const last7Start = new Date(today); last7Start.setDate(last7Start.getDate()-6);
-
-    // Put rows in a map by date
-    const byDate = Object.fromEntries(
-      rows.map(r => [String(r.d), { c: Number(r.c||0), q: Number(r.q||0) }])
-    );
-
-    // Today
-    const todayKey = dayKey(today);
-    const today_c = byDate[todayKey]?.c || 0;
-    const today_q = byDate[todayKey]?.q || 0;
-
-    // Yesterday
-    const ydayKey = dayKey(yday);
-    const yday_c = byDate[ydayKey]?.c || 0;
-    const yday_q = byDate[ydayKey]?.q || 0;
-
-    // Last 7 days (incl today)
-    let last7_c = 0, last7_q = 0;
-    for (let i=0;i<7;i++){
-      const d = new Date(today); d.setDate(d.getDate()-i);
-      const k = dayKey(d);
-      last7_c += byDate[k]?.c || 0;
-      last7_q += byDate[k]?.q || 0;
-    }
-
-    // This month (IST)
-    const y = today.getFullYear();
-    const m = today.getMonth()+1;
-    let month_c = 0, month_q = 0;
-    for (const r of rows){
-      if (Number(r.y)===y && Number(r.m)===m){
-        month_c += Number(r.c||0);
-        month_q += Number(r.q||0);
-      }
-    }
-
+    const map = Object.fromEntries(rows.map(r => [r.k, r]));
     res.json({
-      today:     { count: today_c,     qty: today_q },
-      yesterday: { count: yday_c,      qty: yday_q  },
-      last7:     { count: last7_c,     qty: last7_q },
-      month:     { count: month_c,     qty: month_q }
+      today:     { count: Number(map.today?.c || 0),     qty: Number(map.today?.q || 0) },
+      yesterday: { count: Number(map.yesterday?.c || 0), qty: Number(map.yesterday?.q || 0) },
+      last7:     { count: Number(map.last7?.c || 0),     qty: Number(map.last7?.q || 0) },
+      month:     { count: Number(map.month?.c || 0),     qty: Number(map.month?.q || 0) },
     });
   } catch (err) {
     console.error('order-metrics error:', err);
     res.status(500).json({ error: 'DB error' });
   }
 });
-
 
 
 app.get('/api/weekly-summary', async (req, res) => {

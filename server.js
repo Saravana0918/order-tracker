@@ -81,29 +81,42 @@ app.post('/api/upload-design', upload.single('image'), async (req, res) => {
   }
 });
 
+// /api/set-dispatch-date
 app.post('/api/set-dispatch-date', async (req, res) => {
   try {
     const { order_id, dispatch_date } = req.body;
     if (!order_id || !dispatch_date) {
-      return res.status(400).json({ success: false, error: 'Missing order_id or dispatch_date' });
+      return res.status(400).json({ error: 'order_id and dispatch_date are required' });
     }
 
-    const id = String(order_id);
-    const [result] = await pool.query(
-      'UPDATE `order_progress` SET `dispatch_date` = ? WHERE `order_id` = ? OR `order_name` = ?',
-      [dispatch_date, id, id]
+    // Normalize: dd-mm-yyyy → yyyy-mm-dd; allow yyyy-mm-dd pass-through
+    const toISO = (s) => {
+      if (!s) return null;
+      const ddmmyyyy = /^(\d{2})-(\d{2})-(\d{4})$/;   // 17-08-2025
+      const yyyymmdd = /^(\d{4})-(\d{2})-(\d{2})$/;   // 2025-08-17
+      if (ddmmyyyy.test(s)) {
+        const [, dd, mm, yyyy] = s.match(ddmmyyyy);
+        return `${yyyy}-${mm}-${dd}`;
+      }
+      if (yyyymmdd.test(s)) return s;
+      return null;
+    };
+
+    const iso = toISO(dispatch_date);
+    if (!iso) return res.status(400).json({ error: 'Invalid date format' });
+
+    await pool.execute(
+      'UPDATE order_progress SET dispatch_date = ? WHERE order_id = ?',
+      [iso, order_id]
     );
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, error: 'Order not found in order_progress' });
-    }
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('set-dispatch-date error:', err);
-    res.status(500).json({ success: false, error: err.message });
+    return res.json({ ok: true, dispatch_date: iso });
+  } catch (e) {
+    console.error('set-dispatch-date error', e);
+    return res.status(500).json({ error: 'Server error' });
   }
 });
+
 
 
 /* -------- Assign designer -------- */

@@ -234,7 +234,6 @@ function applyRoleVisibility(){
 }
 
 /* ───────────── Date utils ───────────── */
-// Convert any date string to YYYY-MM-DD for <input type="date">
 function toInputDate(d){
   if(!d) return '';
   const x = new Date(d);
@@ -246,9 +245,11 @@ function toInputDate(d){
 
 /* ───────────── API: Save Dispatch Date ───────────── */
 async function saveDispatchDate(orderId){
-  const inp = document.querySelector(`input[data-disp="${orderId}"]`);
-  if(!inp) return;
-  const date = inp.value;
+  // ✅ match the rendered attribute name
+  const inp = document.querySelector(`input[data-dispatch-input="${orderId}"]`);
+  if(!inp) return alert('Date input not found for this row.');
+
+  const date = (inp.value || '').trim();          // type="date" gives yyyy-mm-dd
   if(!date){ alert('Please choose a dispatch date'); return; }
 
   const oldDisabled = inp.disabled; inp.disabled = true;
@@ -260,24 +261,28 @@ async function saveDispatchDate(orderId){
       body: JSON.stringify({ order_id: orderId, dispatch_date: date })
     });
     const d = await res.json();
-    if(d && d.success){
-      // ✅ instant UI update so it won’t disappear
+
+    // ✅ accept either {success:true} OR {ok:true}
+    if (res.ok && (d.success || d.ok)) {
+      // update local cache so UI immediately reflects saved date
       const idStr = String(orderId);
       allOrders = allOrders.map(o =>
         (String(o.order_id) === idStr || String(o.order_name) === idStr)
           ? { ...o, dispatch_date: date }
           : o
       );
-      // reapply any filtering for current role
+
+      // re-filter and re-render
       filteredOrders = (userRole && userRole.startsWith('design_user'))
         ? allOrders.filter(o => o.design_assignee === username)
         : [...allOrders];
+
       renderTable();
-      loadDispatchUpcomingTable();
+      loadDispatchUpcomingTable();  // refresh the Next 7 Days table
 
       // small visual cue
       inp.classList.add('date-saved');
-      setTimeout(()=>inp.classList.remove('date-saved'), 1200);
+      setTimeout(()=> inp.classList.remove('date-saved'), 1200);
     } else {
       alert(d?.error || 'Failed to save dispatch date');
     }
@@ -288,6 +293,7 @@ async function saveDispatchDate(orderId){
     inp.disabled = oldDisabled;
   }
 }
+
 
 async function loadDispatchUpcomingTable() {
   try {

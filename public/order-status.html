@@ -6,8 +6,7 @@
   <title>Order Production Tracker</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
- <style>
+  <style>
     body            { background:#f4f6f9; }
     .badge-pending  { background:#ffc107;color:#000;border-radius:50px;padding:.4em .8em; }
     .badge-done     { background:#198754;border-radius:50px;padding:.4em .8em; }
@@ -65,44 +64,28 @@
   <div id="dailyStatsWrapper" style="display:none;">
     <div class="row g-3" id="dailyStats">
       <div class="col-6 col-md-3">
-        <div class="kpi-card kpi-today" id="kpiToday"
-     data-bs-toggle="tooltip" data-bs-placement="bottom" title="Quantity: 0">
-        <div class="kpi-icon"><i class="fa-solid fa-calendar-day"></i></div>
-        <div class="kpi-meta">
-          <small>Today</small>
-          <h4 id="countToday">0</h4>
+        <div class="kpi-card kpi-today">
+          <div class="kpi-icon"><i class="fa-solid fa-calendar-day"></i></div>
+          <div class="kpi-meta"><small>Today</small><h4 id="countToday">0</h4></div>
         </div>
       </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-yday">
+          <div class="kpi-icon"><i class="fa-regular fa-calendar"></i></div>
+          <div class="kpi-meta"><small>Yesterday</small><h4 id="countYday">0</h4></div>
+        </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="kpi-card kpi-yday" id="kpiYday"
-     data-bs-toggle="tooltip" data-bs-placement="bottom" title="Quantity: 0">
-      <div class="kpi-icon"><i class="fa-regular fa-calendar"></i></div>
-      <div class="kpi-meta">
-        <small>Yesterday</small>
-        <h4 id="countYday">0</h4>
-      </div>
-    </div>
+        <div class="kpi-card kpi-week">
+          <div class="kpi-icon"><i class="fa-solid fa-chart-line"></i></div>
+          <div class="kpi-meta"><small>Last 7 Days</small><h4 id="count7">0</h4></div>
+        </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="kpi-card kpi-week" id="kpiWeek"
-     data-bs-toggle="tooltip" data-bs-placement="bottom" title="Quantity: 0">
-      <div class="kpi-icon"><i class="fa-solid fa-chart-line"></i></div>
-      <div class="kpi-meta">
-        <small>Last 7 Days</small>
-        <h4 id="count7">0</h4>
-      </div>
-    </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="kpi-card kpi-month" id="kpiMonth"
-     data-bs-toggle="tooltip" data-bs-placement="bottom" title="Quantity: 0">
-      <div class="kpi-icon"><i class="fa-regular fa-calendar-days"></i></div>
-      <div class="kpi-meta">
-        <small>This Month</small>
-        <h4 id="countMonth">0</h4>
-      </div>
-    </div>
+        <div class="kpi-card kpi-month">
+          <div class="kpi-icon"><i class="fa-regular fa-calendar-days"></i></div>
+          <div class="kpi-meta"><small>This Month</small><h4 id="countMonth">0</h4></div>
+        </div>
       </div>
     </div>
   </div>
@@ -291,49 +274,6 @@ async function saveDispatchDate(orderId){
     inp.disabled = oldDisabled;
   }
 }
-
-async function loadKpiMetrics() {
-  try {
-    const res = await fetch('/api/order-metrics');
-    const d = await res.json();
-
-    // Update counts
-    document.getElementById('countToday').textContent  = d.today.count;
-    document.getElementById('countYday').textContent   = d.yesterday.count;
-    document.getElementById('count7').textContent      = d.last7.count;
-    document.getElementById('countMonth').textContent  = d.month.count;
-
-    // Update tooltip titles (Quantity)
-    const setTip = (id, qty) => {
-      const el = document.getElementById(id);
-      el.setAttribute('title', `Quantity: ${qty}`);
-      // re-init tooltip instance with new title
-      const existing = bootstrap.Tooltip.getInstance(el);
-      if (existing) existing.dispose();
-      new bootstrap.Tooltip(el);
-    };
-    setTip('kpiToday',  d.today.qty);
-    setTip('kpiYday',   d.yesterday.qty);
-    setTip('kpiWeek',   d.last7.qty);
-    setTip('kpiMonth',  d.month.qty);
-
-  } catch (e) {
-    console.error('loadKpiMetrics error:', e);
-  }
-}
-
-// Initialize all tooltips once (safe even if called again)
-document.addEventListener('DOMContentLoaded', () => {
-  [...document.querySelectorAll('[data-bs-toggle="tooltip"]')]
-    .forEach(el => new bootstrap.Tooltip(el));
-  loadKpiMetrics();
-});
-
-// Also refresh KPIs whenever you sync/import orders
-// e.g., after /api/sync-orders success:
-/// await loadOrders();
-/// loadKpiMetrics();
-
 
 async function loadDispatchUpcomingTable() {
   try {

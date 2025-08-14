@@ -152,14 +152,16 @@
 /* ───────────── Config ───────────── */
 const stages = ['design','printing','fusing','stitching','shipping'];
 const allCols = [
-  "order-id", "customer", "design", "design_assignee", "design_preview",
-  "printing", "fusing", "stitching", "shipping", "dispatch_date", "updated",
-  "price", "fulfillment", "payment", "shiptype", "items", "tags", "address", "actions"
+  "order-id", "customer", "design",
+  "dispatch_date",
+  "design_assignee", "design_preview",
+  "printing", "fusing", "stitching", "shipping",
+  "updated", "price", "fulfillment", "payment", "shiptype", "items", "tags", "address", "actions"
 ];
 
 const roleCols = {
-  admin:     ['order-id','customer','design','design_assignee','design_preview','printing','fusing','stitching','shipping','dispatch_date','updated','actions'],
-  customer:  ['order-id','customer','design','design_assignee','design_preview','printing','fusing','stitching','shipping','dispatch_date','updated','actions'],
+  admin:     ['order-id','customer','design','dispatch_date','design_assignee','design_preview','printing','fusing','stitching','shipping','updated','actions'],
+  customer:  ['order-id','customer','design','dispatch_date','design_assignee','design_preview','printing','fusing','stitching','shipping','updated','actions'],
   design:    ['order-id','customer','design','dispatch_date','updated','actions'],
   printing:  ['order-id','customer','design_preview','dispatch_date','updated','actions'],
   fusing:    ['order-id','customer','design_preview','dispatch_date','updated','actions'],
@@ -183,6 +185,18 @@ homeBtn.addEventListener('click', () => {
   const tableSection = document.getElementById('mainTableSection');
   if (tableSection) tableSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
+
+function setAssigneeEnabled(orderId, enabled) {
+  const sel = document.querySelector(`select[data-order-id="${orderId}"]`);
+  const btn = document.querySelector(`button[data-assign-btn="${orderId}"]`);
+  if (sel) sel.disabled = !enabled;
+  if (btn) btn.disabled = !enabled;
+}
+
+function onDispatchChange(orderId) {
+  const inp = document.querySelector(`input[data-dispatch-input="${orderId}"]`);
+  setAssigneeEnabled(orderId, Boolean(inp && inp.value));
+}
 
 /* ───────────── Auth helpers ───────────── */
 function logout(){ localStorage.clear(); location.href = '/login'; }
@@ -661,44 +675,30 @@ function renderTable(){
 
     visible.forEach(col=>{
       let value='-';
-      if(col==='order-id') value = r.order_name || r.order_id;
-      else if(col==='customer') value = r.customer_name || '-';
+
+      if (col==='order-id') {
+        value = r.order_name || r.order_id;
+      }
+      else if (col==='customer') {
+        value = r.customer_name || '-';
+      }
       else if (stages.includes(col)) {
         value = getStatusBadge(r[col + '_done']);
       }
-      else if(col==='design_assignee'){
-        if(userRole==='admin' || userRole==='customer'){
-          value=`<div class="d-flex align-items-center gap-1">
-            <select class="form-select form-select-sm" data-order-id="${r.order_id}">
-              <option value="">${r.design_assignee ? r.design_assignee : 'Assign…'}</option>
-              <option value="srikanth">Srikanth</option>
-              <option value="kushi">Kushi</option>
-              <option value="shravanthi">Shravanthi</option>
-              <option value="mahesh">Mahesh</option>
-              <option value="pawan">Pawan</option>
-            </select>
-            <button class="btn btn-sm btn-primary" onclick="assignDesigner('${r.order_id}')">
-              ${r.design_assignee ? 'Reassign' : 'Assign'}
-            </button>
-          </div>`;
-        } else {
-          value = r.design_assignee ? `<span class="badge badge-assign">${r.design_assignee}</span>` : '-';
-        }
-      }
-      else if(col==='design_preview'){
-        value = r.design_image
-          ? `<img src="/uploads/design/${r.design_image}" style="max-width:90px;border:1px solid #ccc;cursor:pointer"
-                 title="Click to enlarge" onclick="window.open('/uploads/design/${r.design_image}','_blank')">`
-          : '-';
-      }
+
+      // --- Dispatch date BEFORE assignee; date change enables assignee
       else if (col === 'dispatch_date') {
         const current = toInputDate(r.dispatch_date);
         if (userRole === 'admin' || userRole === 'customer'){
-          const t = toInputDate(new Date());
+          const minDate = toInputDate(new Date());
           value = `
             <div class="d-flex align-items-center gap-1">
-              <input type="date" class="form-control form-control-sm"
-                     data-disp="${r.order_id}" value="${current}" min="${t}">
+              <input type="date"
+                     class="form-control form-control-sm"
+                     data-dispatch-input="${r.order_id}"
+                     value="${current}"
+                     min="${minDate}"
+                     onchange="onDispatchChange('${r.order_id}')">
               <button class="btn btn-sm btn-outline-primary"
                       onclick="saveDispatchDate('${r.order_id}')">Save</button>
             </div>`;
@@ -706,10 +706,51 @@ function renderTable(){
           value = current || '-';
         }
       }
-      else if(col==='updated') value = new Date(r.created_at).toLocaleString();
-      else if(col==='actions'){
-        if(userRole.startsWith('design') && !r.design_done && r.design_assignee===username){
-          value=`<div class="d-flex flex-column gap-1">
+
+      // --- Design assignee (disabled until date set)
+      else if (col==='design_assignee'){
+        if (userRole==='admin' || userRole==='customer'){
+          const hasDate = Boolean(r.dispatch_date);
+          value = `
+            <div class="d-flex align-items-center gap-1">
+              <select class="form-select form-select-sm"
+                      data-order-id="${r.order_id}"
+                      ${hasDate ? '' : 'disabled'}
+                      title="${hasDate ? '' : 'Set dispatch date first'}">
+                <option value="">${r.design_assignee ? r.design_assignee : 'Assign…'}</option>
+                <option value="srikanth">Srikanth</option>
+                <option value="kushi">Kushi</option>
+                <option value="shravanthi">Shravanthi</option>
+                <option value="mahesh">Mahesh</option>
+                <option value="pawan">Pawan</option>
+              </select>
+              <button class="btn btn-sm btn-primary"
+                      data-assign-btn="${r.order_id}"
+                      ${hasDate ? '' : 'disabled'}
+                      onclick="assignDesigner('${r.order_id}')">
+                ${r.design_assignee ? 'Reassign' : 'Assign'}
+              </button>
+            </div>`;
+        } else {
+          value = r.design_assignee ? `<span class="badge badge-assign">${r.design_assignee}</span>` : '-';
+        }
+      }
+
+      else if (col==='design_preview'){
+        value = r.design_image
+          ? `<img src="/uploads/design/${r.design_image}" style="max-width:90px;border:1px solid #ccc;cursor:pointer"
+                 title="Click to enlarge" onclick="window.open('/uploads/design/${r.design_image}','_blank')">`
+          : '-';
+      }
+
+      else if (col==='updated') {
+        value = new Date(r.created_at).toLocaleString();
+      }
+
+      else if (col==='actions'){
+        if (userRole.startsWith('design') && !r.design_done && r.design_assignee===username){
+          value=`
+            <div class="d-flex flex-column gap-1">
               <input type="file" id="file-${r.order_id}" class="form-control form-control-sm"
                      accept="image/*" onchange="preview('${r.order_id}')">
               <img id="thumb-${r.order_id}" style="max-width:90px;display:none;border:1px solid #ccc">
@@ -723,22 +764,30 @@ function renderTable(){
           (userRole==='stitching' && !r.stitching_done)||
           (userRole==='shipping'  && !r.shipping_done)
         ){
-          value=`<button class="btn btn-sm btn-success" onclick="quickDone('${r.order_id}')">
-                   Mark as Done
-                 </button>`;
+          value=`
+            <button class="btn btn-sm btn-success" onclick="quickDone('${r.order_id}')">
+              Mark as Done
+            </button>`;
         }
-      } else value = r[col] ?? '-';
+      }
+
+      else {
+        value = r[col] ?? '-';
+      }
 
       html += `<td data-column="${col}">${value}</td>`;
     });
+
     tr.innerHTML = html;
     tbody.appendChild(tr);
   });
 
   document.getElementById('orderCountText').innerText =
     `Showing ${filteredOrders.length} orders`;
+
   applyRoleVisibility();
 }
+
 
 window.onload = async () => {
   checkLogin();

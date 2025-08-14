@@ -434,6 +434,82 @@ app.get('/api/dispatch-summary-upcoming', async (req, res) => {
   }
 });
 
+app.get('/api/order-metrics', async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        /* Local time */
+        DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) AS d,
+        YEAR(CONVERT_TZ(created_at, '+00:00', '+05:30'))  AS y,
+        MONTH(CONVERT_TZ(created_at, '+00:00', '+05:30')) AS m,
+        COUNT(*) AS c,
+        SUM(item_count) AS q
+      FROM order_progress
+      WHERE created_at >= (UTC_TIMESTAMP() - INTERVAL 40 DAY) /* small window is enough */
+      GROUP BY d, y, m
+    `);
+
+    const today = new Date();
+    const istTodayStr = new Date(today.getTime() + (5.5*60*60*1000))
+      .toISOString().slice(0,10); // yyyy-mm-dd in IST roughly (good enough here)
+
+    // helper to yyyy-mm-dd local (IST) for comparisons
+    const dayKey = (dt) => {
+      const x = new Date(dt.getTime() + (5.5*60*60*1000));
+      return x.toISOString().slice(0,10);
+    };
+
+    const yday = new Date(today); yday.setDate(yday.getDate()-1);
+    const last7Start = new Date(today); last7Start.setDate(last7Start.getDate()-6);
+
+    // Put rows in a map by date
+    const byDate = Object.fromEntries(
+      rows.map(r => [String(r.d), { c: Number(r.c||0), q: Number(r.q||0) }])
+    );
+
+    // Today
+    const todayKey = dayKey(today);
+    const today_c = byDate[todayKey]?.c || 0;
+    const today_q = byDate[todayKey]?.q || 0;
+
+    // Yesterday
+    const ydayKey = dayKey(yday);
+    const yday_c = byDate[ydayKey]?.c || 0;
+    const yday_q = byDate[ydayKey]?.q || 0;
+
+    // Last 7 days (incl today)
+    let last7_c = 0, last7_q = 0;
+    for (let i=0;i<7;i++){
+      const d = new Date(today); d.setDate(d.getDate()-i);
+      const k = dayKey(d);
+      last7_c += byDate[k]?.c || 0;
+      last7_q += byDate[k]?.q || 0;
+    }
+
+    // This month (IST)
+    const y = today.getFullYear();
+    const m = today.getMonth()+1;
+    let month_c = 0, month_q = 0;
+    for (const r of rows){
+      if (Number(r.y)===y && Number(r.m)===m){
+        month_c += Number(r.c||0);
+        month_q += Number(r.q||0);
+      }
+    }
+
+    res.json({
+      today:     { count: today_c,     qty: today_q },
+      yesterday: { count: yday_c,      qty: yday_q  },
+      last7:     { count: last7_c,     qty: last7_q },
+      month:     { count: month_c,     qty: month_q }
+    });
+  } catch (err) {
+    console.error('order-metrics error:', err);
+    res.status(500).json({ error: 'DB error' });
+  }
+});
+
+
 
 app.get('/api/weekly-summary', async (req, res) => {
   try {

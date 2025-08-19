@@ -246,7 +246,8 @@ function parseDateString(dateStr) {
 
 function isReadyForDesign(o) {
   // hide when BOTH are set
-  return Boolean(o.dispatch_date) && Boolean(o.design_assignee);
+  const hasValidDispatchDate = Boolean(o.dispatch_date) && o.dispatch_date !== 'dd-mm-yyyy';
+  return hasValidDispatchDate && Boolean(o.design_assignee);
 }
 
 function baseCustomerFilter(list) {

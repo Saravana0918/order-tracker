@@ -185,6 +185,7 @@ app.get('/api/orders', async (req, res) => {
         payment_status     AS payment,
         shipping_method    AS shiptype,
         item_count         AS items,
+        COALESCE(total_quantity, item_count, 0) AS total_quantity,
         tags,
         address,
         design_done,
@@ -228,6 +229,27 @@ app.get('/api/orders', async (req, res) => {
   }
 });
 
+// -------- Dispatch Details (Next 7 Days): Date | Order ID | Quantity --------
+app.get('/api/dispatch-details-upcoming', async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        DATE_FORMAT(dispatch_date, '%Y-%m-%d') AS date,
+        order_id,
+        order_name,
+        COALESCE(total_quantity, item_count, 0) AS quantity
+      FROM order_progress
+      WHERE dispatch_date BETWEEN CURDATE() AND (CURDATE() + INTERVAL 6 DAY)
+      ORDER BY dispatch_date ASC, order_id ASC
+    `);
+    res.json({ rows });
+  } catch (err) {
+    console.error('dispatch details error:', err);
+    res.status(500).json({ error: 'DB Error' });
+  }
+});
+
+
 
 /* -------- Sync Shopify Orders (Manual Refresh) -------- */
 app.post('/api/sync-orders', async (req, res) => {
@@ -254,6 +276,8 @@ app.post('/api/sync-orders', async (req, res) => {
         ? `${o.shipping_address.address1 || ''}, ${o.shipping_address.city || ''}, ${o.shipping_address.province || ''}, ${o.shipping_address.country || ''}, ${o.shipping_address.zip || ''}`
         : '';
 
+          const totalQty = (o.line_items || []).reduce((t, li) => t + (Number(li.quantity) || 0), 0);
+
       if (!exists.length) {
         const shopifyCreatedAt = new Date(o.created_at);
 
@@ -261,7 +285,7 @@ app.post('/api/sync-orders', async (req, res) => {
           `INSERT INTO order_progress (
             order_id, order_name, customer_name,
             total_price, fulfillment_status, payment_status,
-            shipping_method, item_count, tags, address, created_at, updated_at
+            shipping_method, item_count, total_quantity, tags, address, created_at, updated_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             orderId, o.name, customerName,
@@ -270,6 +294,7 @@ app.post('/api/sync-orders', async (req, res) => {
             o.financial_status || '',
             o.shipping_lines?.[0]?.title || '',
             o.line_items?.length || 0,
+            totalQty, 
             o.tags || '',
             address,
             shopifyCreatedAt,

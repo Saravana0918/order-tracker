@@ -39,6 +39,9 @@
 
     /* Small visual for saved date */
     .date-saved { outline: 2px solid #19875466; border-radius: 6px; }
+    #weeklyPendingSummary, #dispatchSummary, #ordersSummary {
+      display: none;
+  }
   </style>
 </head>
 <body class="p-4">
@@ -105,42 +108,46 @@
   </div>
   <div id="userOrdersContainer" class="mt-4"></div>
 
-  <h4 class="mt-4 d-flex align-items-center justify-content-between">
-    Weekly Pending Summary (Last 7 Days)
-    <button class="btn btn-secondary btn-sm mb-2" onclick="loadWeeklyPendingTable()">Refresh</button>
-  </h4>
-
-  <div id="weekly-summary-container" class="table-responsive">
-    <table class="table table-bordered text-center" id="weekly-summary-table">
-      <thead>
-        <tr id="weekly-summary-header"></tr>
-      </thead>
-      <tbody id="weekly-summary-body"></tbody>
-    </table>
-  </div>
+  <div id="weeklyPendingSummary">
+    <h4 class="mt-4 d-flex align-items-center justify-content-between">
+    Weekly Pending Summary (Last 7 Days)
+    <button class="btn btn-secondary btn-sm mb-2" onclick="loadWeeklyPendingTable()">Refresh</button>
+  </h4>
+  <div id="weekly-summary-container" class="table-responsive">
+    <table class="table table-bordered text-center" id="weekly-summary-table">
+      <thead>
+        <tr id="weekly-summary-header"></tr>
+      </thead>
+      <tbody id="weekly-summary-body"></tbody>
+    </table>
+  </div>
+</div>
   
-<h4 class="mt-4 d-flex align-items-center justify-content-between">
-  Dispatch Summary (Next 7 Days)
-  <button class="btn btn-secondary btn-sm mb-2" onclick="loadDispatchUpcomingTable()">Refresh</button>
+<div id="dispatchSummary">
+    <h4 class="mt-4 d-flex align-items-center justify-content-between">
+    Dispatch Summary (Next 7 Days)
+    <button class="btn btn-secondary btn-sm mb-2" onclick="loadDispatchUpcomingTable()">Refresh</button>
 </h4>
-
 <div class="table-responsive">
-  <table class="table table-bordered text-center">
-    <thead><tr id="dispatch-up-header"></tr></thead>
-    <tbody id="dispatch-up-body"></tbody>
-  </table>
+  <table class="table table-bordered text-center">
+    <thead><tr id="dispatch-up-header"></tr></thead>
+    <tbody id="dispatch-up-body"></tbody>
+  </table>
+</div>
 </div>
 
 
-<h4 class="mt-4 d-flex align-items-center justify-content-between">
-    Orders Summary (Next 7 Days)
-    <button class="btn btn-secondary btn-sm mb-2" onclick="loadOrdersSummaryTable()">Refresh</button>
+<div id="ordersSummary">
+    <h4 class="mt-4 d-flex align-items-center justify-content-between">
+    Orders Summary (last 7 Days)
+    <button class="btn btn-secondary btn-sm mb-2" onclick="loadOrdersSummaryTable()">Refresh</button>
 </h4>
 <div class="table-responsive">
-    <table class="table table-bordered text-center">
-        <thead><tr id="orders-summary-header"></tr></thead>
-        <tbody id="orders-summary-body"></tbody>
-    </table>
+    <table class="table table-bordered text-center">
+        <thead><tr id="orders-summary-header"></tr></thead>
+        <tbody id="orders-summary-body"></tbody>
+    </table>
+</div>
 </div>
 
   <!-- ORDER TABLE -->
@@ -208,22 +215,29 @@ function onDispatchChange(orderId) {
 }
 
 /* ───────────── Auth helpers ───────────── */
+/* ───────────── Auth helpers ───────────── */
 function logout(){ localStorage.clear(); location.href = '/login'; }
 function checkLogin(){
-  userRole = localStorage.getItem('role') || '';
-  username = localStorage.getItem('username') || '';
+  userRole = localStorage.getItem('role') || '';
+  username = localStorage.getItem('username') || '';
 
-  if(!username) location.href = '/login';
-  document.getElementById('loggedUser').innerText = `${username} (${userRole})`;
+  if(!username) location.href = '/login';
+  document.getElementById('loggedUser').innerText = `${username} (${userRole})`;
 
-  // Cards + weekly perf only for admin & customer
-  const statsWrap = document.getElementById('dailyStatsWrapper');
-  if (userRole === 'admin' || userRole === 'customer') {
-    document.getElementById('weeklyPerformanceCard').style.display = 'block';
-    if (statsWrap) statsWrap.style.display = 'block';
-  } else {
-    if (statsWrap) statsWrap.style.display = 'none';
-  }
+  // Cards + weekly perf only for admin & customer
+  const statsWrap = document.getElementById('dailyStatsWrapper');
+  if (userRole === 'admin' || userRole === 'customer') {
+    document.getElementById('weeklyPerformanceCard').style.display = 'block';
+    if (statsWrap) statsWrap.style.display = 'block';
+    
+    // Show all three summary tables for these roles
+    document.getElementById('weeklyPendingSummary').style.display = 'block';
+    document.getElementById('dispatchSummary').style.display = 'block';
+    document.getElementById('ordersSummary').style.display = 'block';
+
+  } else {
+    if (statsWrap) statsWrap.style.display = 'none';
+  }
 }
 
 function parseDateString(dateStr) {

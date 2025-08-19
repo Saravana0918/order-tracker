@@ -229,23 +229,55 @@ app.get('/api/orders', async (req, res) => {
   }
 });
 
-// -------- Dispatch Details (Next 7 Days): Date | Order ID | Quantity --------
 // Dispatch Summary (Next 7 Days)
 app.get('/api/dispatch-summary-upcoming', async (req, res) => {
   try {
-    const [rows] = await pool.query(`
+    // Build 7-day calendar (today .. +6)
+    const [calendar] = await pool.query(`
+      SELECT DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL seq DAY), '%Y-%m-%d') AS date
+      FROM (
+        SELECT 0 AS seq UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL
+        SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6
+      ) AS days
+      ORDER BY seq
+    `);
+
+    const [agg] = await pool.query(`
       SELECT
         DATE_FORMAT(dispatch_date, '%Y-%m-%d') AS date,
-        COUNT(DISTINCT order_id) AS order_count,
-        SUM(COALESCE(total_quantity, item_count, 0)) AS total_quantity
+        COUNT(*) AS total,
+        SUM(CASE WHEN design_assignee='srikanth'  AND (design_done=0 OR design_done IS NULL) THEN 1 ELSE 0 END) AS srikanth,
+        SUM(CASE WHEN design_assignee='kushi'     AND (design_done=0 OR design_done IS NULL) THEN 1 ELSE 0 END) AS kushi,
+        SUM(CASE WHEN design_assignee='shravanthi'AND (design_done=0 OR design_done IS NULL) THEN 1 ELSE 0 END) AS shravanthi,
+        SUM(CASE WHEN design_assignee='mahesh'    AND (design_done=0 OR design_done IS NULL) THEN 1 ELSE 0 END) AS mahesh,
+        SUM(CASE WHEN design_assignee='pawan'     AND (design_done=0 OR design_done IS NULL) THEN 1 ELSE 0 END) AS pawan,
+
+        -- stage breakdowns
+        SUM(CASE WHEN design_done=1 AND printing_done=0 THEN 1 ELSE 0 END) AS printing_user,
+        SUM(CASE WHEN design_done=1 AND printing_done=1 AND fusing_done=0 THEN 1 ELSE 0 END) AS fusing_user,
+        SUM(CASE WHEN design_done=1 AND printing_done=1 AND fusing_done=1 AND stitching_done=0 THEN 1 ELSE 0 END) AS stitching_user,
+        SUM(CASE WHEN design_done=1 AND printing_done=1 AND fusing_done=1 AND stitching_done=1 AND shipping_done=0 THEN 1 ELSE 0 END) AS shipping_user
+
       FROM order_progress
       WHERE dispatch_date BETWEEN CURDATE() AND (CURDATE() + INTERVAL 6 DAY)
       GROUP BY DATE_FORMAT(dispatch_date, '%Y-%m-%d')
-      ORDER BY date ASC
+      ORDER BY DATE_FORMAT(dispatch_date, '%Y-%m-%d') ASC
     `);
-    res.json({ rows });
+
+    // Fill calendar with 0s
+    const map = Object.fromEntries(agg.map(r => [r.date, r]));
+    const out = calendar.map(d => ({
+      date: d.date,
+      ...(map[d.date] || {
+        total: 0,
+        srikanth: 0, kushi: 0, shravanthi: 0, mahesh: 0, pawan: 0,
+        printing_user: 0, fusing_user: 0, stitching_user: 0, shipping_user: 0
+      })
+    }));
+
+    res.json({ rows: out });
   } catch (err) {
-    console.error('dispatch summary error:', err);
+    console.error('dispatch summary detailed error:', err);
     res.status(500).json({ error: 'DB Error' });
   }
 });
@@ -400,74 +432,21 @@ app.get('/api/dispatch-summary-totals', async (req, res) => {
 });
 
 // ---------------- DISPATCH SUMMARY (UPCOMING 7 DAYS) ----------------
-app.get('/api/dispatch-summary-upcoming', async (req, res) => {
+app.get('/api/dispatch-summary-upcoming-basic', async (req, res) => {
   try {
-    // Build 7-day calendar (today .. +6)
-    const [calendar] = await pool.query(`
-      SELECT DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL seq DAY), '%Y-%m-%d') AS date
-      FROM (
-        SELECT 0 AS seq UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL
-        SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6
-      ) AS days
-      ORDER BY seq
-    `);
-
-    // Aggregate once for the whole 7-day window
-    const [agg] = await pool.query(`
+    const [rows] = await pool.query(`
       SELECT
         DATE_FORMAT(dispatch_date, '%Y-%m-%d') AS date,
-        COUNT(*) AS total,
-
-        /* per-designer: ONLY design-pending */
-        SUM(CASE WHEN design_assignee='srikanth'
-                  AND (design_done IS NULL OR design_done=0)
-                 THEN 1 ELSE 0 END) AS srikanth,
-        SUM(CASE WHEN design_assignee='kushi'
-                  AND (design_done IS NULL OR design_done=0)
-                 THEN 1 ELSE 0 END) AS kushi,
-        SUM(CASE WHEN design_assignee='shravanthi'
-                  AND (design_done IS NULL OR design_done=0)
-                 THEN 1 ELSE 0 END) AS shravanthi,
-        SUM(CASE WHEN design_assignee='mahesh'
-                  AND (design_done IS NULL OR design_done=0)
-                 THEN 1 ELSE 0 END) AS mahesh,
-        SUM(CASE WHEN design_assignee='pawan'
-                  AND (design_done IS NULL OR design_done=0)
-                 THEN 1 ELSE 0 END) AS pawan,
-
-        /* stage-wise pending for that dispatch date */
-        SUM(CASE WHEN design_done=1 AND printing_done=0 THEN 1 ELSE 0 END) AS printing_user,
-        SUM(CASE WHEN design_done=1 AND printing_done=1 AND fusing_done=0 THEN 1 ELSE 0 END) AS fusing_user,
-        SUM(CASE WHEN design_done=1 AND printing_done=1 AND fusing_done=1 AND stitching_done=0 THEN 1 ELSE 0 END) AS stitching_user,
-        SUM(CASE WHEN design_done=1 AND printing_done=1 AND fusing_done=1 AND stitching_done=1 AND shipping_done=0 THEN 1 ELSE 0 END) AS shipping_user
-
+        COUNT(DISTINCT order_id) AS order_count,
+        SUM(COALESCE(total_quantity, item_count, 0)) AS total_quantity
       FROM order_progress
       WHERE dispatch_date BETWEEN CURDATE() AND (CURDATE() + INTERVAL 6 DAY)
-
-      /* IMPORTANT: match the SELECT expression to satisfy ONLY_FULL_GROUP_BY */
       GROUP BY DATE_FORMAT(dispatch_date, '%Y-%m-%d')
-      ORDER BY DATE_FORMAT(dispatch_date, '%Y-%m-%d') ASC
+      ORDER BY date ASC
     `);
-
-    // Map + fill zeroes for days with no rows
-    const map = Object.fromEntries(agg.map(r => [r.date, r]));
-    const rows = calendar.map(c => ({
-      date: c.date,
-      total: Number(map[c.date]?.total || 0),
-      srikanth:       Number(map[c.date]?.srikanth       || 0),
-      kushi:          Number(map[c.date]?.kushi          || 0),
-      shravanthi:     Number(map[c.date]?.shravanthi     || 0),
-      mahesh:         Number(map[c.date]?.mahesh         || 0),
-      pawan:          Number(map[c.date]?.pawan          || 0),
-      printing_user:  Number(map[c.date]?.printing_user  || 0),
-      fusing_user:    Number(map[c.date]?.fusing_user    || 0),
-      stitching_user: Number(map[c.date]?.stitching_user || 0),
-      shipping_user:  Number(map[c.date]?.shipping_user  || 0),
-    }));
-
-    res.json(rows);
+    res.json({ rows });
   } catch (err) {
-    console.error('Dispatch upcoming summary error:', err);
+    console.error('dispatch summary basic error:', err);
     res.status(500).json({ error: 'DB Error' });
   }
 });

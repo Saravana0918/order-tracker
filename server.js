@@ -300,42 +300,40 @@ app.post('/api/sync-orders', async (req, res) => {
 // ---------------- ORDERS SUMMARY METRICS (UPCOMING 7 DAYS) ----------------
 app.get('/api/orders-summary-metrics', async (req, res) => {
     try {
-        // Build 7-day calendar (today .. +6)
+        // Build 7-day calendar (last 7 days, including today)
         const [calendar] = await pool.query(`
-            SELECT DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL seq DAY), '%Y-%m-%d') AS date
+            SELECT DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL seq DAY), '%Y-%m-%d') AS date
             FROM (
                 SELECT 0 AS seq UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL
                 SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6
             ) AS days
-            ORDER BY seq
+            ORDER BY seq ASC
         `);
 
-        // Aggregate order count and total quantity for the next 7 days
+        // Aggregate order count and total quantity based on CREATED_AT
         const [agg] = await pool.query(`
             SELECT
-                DATE_FORMAT(dispatch_date, '%Y-%m-%d') AS date,
-                COUNT(*) AS order_count,
+                DATE_FORMAT(created_at, '%Y-%m-%d') AS date,
+                COUNT(*) AS number_of_orders,
                 SUM(item_count) AS total_quantity
             FROM order_progress
-            WHERE dispatch_date BETWEEN CURDATE() AND (CURDATE() + INTERVAL 6 DAY)
+            WHERE created_at >= (CURDATE() - INTERVAL 6 DAY)
             GROUP BY date
             ORDER BY date ASC
         `);
 
-        // Map the results for quick lookup
         const map = Object.fromEntries(agg.map(r => [r.date, {
-            order_count: Number(r.order_count || 0),
+            number_of_orders: Number(r.number_of_orders || 0),
             total_quantity: Number(r.total_quantity || 0)
         }]));
 
-        // Combine calendar with aggregated data, filling in zeros for missing days
         const rows = calendar.map(c => ({
             date: c.date,
-            number_of_orders: map[c.date]?.order_count || 0,
+            number_of_orders: map[c.date]?.number_of_orders || 0,
             total_quantity: map[c.date]?.total_quantity || 0,
         }));
 
-        res.json(rows);
+        res.json(rows.reverse()); // Reverse to show today first
     } catch (err) {
         console.error('Orders summary metrics error:', err);
         res.status(500).json({ error: 'DB Error' });

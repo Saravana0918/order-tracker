@@ -131,24 +131,6 @@
   </table>
 </div>
 
-<h4 class="mt-4 d-flex align-items-center justify-content-between">
-  Dispatch Details (Next 7 Days)
-  <button class="btn btn-secondary btn-sm mb-2" onclick="loadDispatchDetailsTable()">Refresh</button>
-</h4>
-
-<div class="table-responsive">
-  <table class="table table-bordered text-center">
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Order ID</th>
-        <th>Quantity</th>
-      </tr>
-    </thead>
-    <tbody id="dispatch-details-body"></tbody>
-  </table>
-</div>
-
 
 
 
@@ -369,28 +351,8 @@ async function loadDispatchUpcomingTable() {
 // load on page load with others
 document.addEventListener('DOMContentLoaded', () => {
   loadDispatchUpcomingTable();
-  loadDispatchDetailsTable();
 });
 
-async function loadDispatchDetailsTable(){
-  try{
-    const res = await fetch('/api/dispatch-details-upcoming');
-    const data = await res.json();
-    const body = document.getElementById('dispatch-details-body');
-    body.innerHTML = '';
-
-    (data.rows || []).forEach(r => {
-      body.innerHTML += `
-        <tr>
-          <td>${r.date}</td>
-          <td>${r.order_name || r.order_id}</td>
-          <td>${r.quantity ?? 0}</td>
-        </tr>`;
-    });
-  } catch(e){
-    console.error('loadDispatchDetailsTable error:', e);
-  }
-}
 
 
 /* ───────────── Fetch orders ───────────── */
@@ -475,28 +437,25 @@ async function loadWeeklyPendingTable() {
 }
 document.addEventListener('DOMContentLoaded', loadWeeklyPendingTable);
 
-async function loadDispatchSummary() {
-    try {
-      const res = await fetch('/api/dispatch-summary-upcoming');
-      const data = await res.json();
-      const tbody = document.querySelector('#dispatchSummaryTable tbody');
-      tbody.innerHTML = '';
+async function loadDispatchSummaryTable() {
+  try {
+    const res = await fetch('/api/dispatch-summary-totals');  // 👈 new fast endpoint
+    const data = await res.json();
+    if (!Array.isArray(data) || !data.length) return;
 
-      data.rows.forEach(row => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${row.date}</td>
-          <td>${row.order_count}</td>
-          <td>${row.total_quantity}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-    } catch (err) {
-      console.error('Error loading summary:', err);
+    const headerRow = document.getElementById('dispatch-summary-header');
+    const body      = document.getElementById('dispatch-summary-body');
+
+    headerRow.innerHTML = `<th>Date</th><th>Total</th>`;
+    body.innerHTML = '';
+
+    for (const r of data) {
+      body.innerHTML += `<tr><td>${r.date}</td><td>${r.total}</td></tr>`;
     }
+  } catch (e) {
+    console.error('Error loading dispatch summary:', e);
   }
-
-  loadDispatchSummary();
+}
 
 
 /* ───────────── Show User Orders ───────────── */
@@ -662,7 +621,6 @@ async function assignDesigner(orderId){
     }
 
     loadDispatchUpcomingTable();
-    loadDispatchDetailsTable();
   } else {
     alert(data?.error || 'Assignment failed');
   }

@@ -241,58 +241,63 @@ app.post('/api/sync-orders', async (req, res) => {
     );
 
     let imported = 0;
-
+    
+    // Process each order with its own error handling
     for (const o of shopifyRes.data.orders) {
-      const orderId = o.id.toString();
-      const [exists] = await pool.execute(
-        'SELECT 1 FROM order_progress WHERE order_id = ?',
-        [orderId]
-      );
-
-      const customerName = `${o.customer?.first_name || ''} ${o.customer?.last_name || ''}`.trim();
-      const address = o.shipping_address
-        ? `${o.shipping_address.address1 || ''}, ${o.shipping_address.city || ''}, ${o.shipping_address.province || ''}, ${o.shipping_address.country || ''}, ${o.shipping_address.zip || ''}`
-        : '';
-      
-      // Calculate the total quantity correctly
-      const itemCount = o.line_items.reduce((total, item) => total + item.quantity, 0);
-
-      if (exists.length) {
-        // If the order already exists, update its item_count
-        await pool.execute(
-          `UPDATE order_progress SET item_count = ?, updated_at = NOW() WHERE order_id = ?`,
-          [itemCount, orderId]
+      try {
+        const orderId = o.id.toString();
+        const [exists] = await pool.execute(
+          'SELECT 1 FROM order_progress WHERE order_id = ?',
+          [orderId]
         );
-      } else {
-        // If the order is new, insert it
-        const shopifyCreatedAt = new Date(o.created_at);
+
+        const customerName = `${o.customer?.first_name || ''} ${o.customer?.last_name || ''}`.trim();
+        const address = o.shipping_address
+          ? `${o.shipping_address.address1 || ''}, ${o.shipping_address.city || ''}, ${o.shipping_address.province || ''}, ${o.shipping_address.country || ''}, ${o.shipping_address.zip || ''}`
+          : '';
         
-        await pool.execute(
-          `INSERT INTO order_progress (
-            order_id, order_name, customer_name,
-            total_price, fulfillment_status, payment_status,
-            shipping_method, item_count, tags, address, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            orderId, o.name, customerName,
-            o.total_price || 0,
-            o.fulfillment_status || '',
-            o.financial_status || '',
-            o.shipping_lines?.[0]?.title || '',
-            itemCount,
-            o.tags || '',
-            address,
-            shopifyCreatedAt,
-            shopifyCreatedAt
-          ]
-        );
-        imported++;
+        // Calculate the total quantity safely
+        let itemCount = 0;
+        if (Array.isArray(o.line_items)) {
+          itemCount = o.line_items.reduce((total, item) => total + item.quantity, 0);
+        }
+
+        if (exists.length) {
+          await pool.execute(
+            `UPDATE order_progress SET item_count = ?, updated_at = NOW() WHERE order_id = ?`,
+            [itemCount, orderId]
+          );
+        } else {
+          const shopifyCreatedAt = new Date(o.created_at);
+          await pool.execute(
+            `INSERT INTO order_progress (
+              order_id, order_name, customer_name,
+              total_price, fulfillment_status, payment_status,
+              shipping_method, item_count, tags, address, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              orderId, o.name, customerName,
+              o.total_price || 0,
+              o.fulfillment_status || '',
+              o.financial_status || '',
+              o.shipping_lines?.[0]?.title || '',
+              itemCount,
+              o.tags || '',
+              address,
+              shopifyCreatedAt,
+              shopifyCreatedAt
+            ]
+          );
+          imported++;
+        }
+      } catch (innerErr) {
+        console.error(`Failed to process order ${o.name || o.id}:`, innerErr);
       }
     }
 
     res.json({ success: true, imported });
   } catch (err) {
-    console.error('Sync error:', err);
+    console.error('Shopify sync failed:', err);
     res.status(500).json({ success: false, error: 'Shopify sync failed' });
   }
 });

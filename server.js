@@ -241,13 +241,12 @@ app.post('/api/sync-orders', async (req, res) => {
     );
 
     let imported = 0;
-    
-    // Process each order with its own error handling
+
     for (const o of shopifyRes.data.orders) {
       try {
         const orderId = o.id.toString();
         const [exists] = await pool.execute(
-          'SELECT 1 FROM order_progress WHERE order_id = ?',
+          'SELECT 1 FROM `order_progress` WHERE `order_id` = ?',
           [orderId]
         );
 
@@ -255,8 +254,7 @@ app.post('/api/sync-orders', async (req, res) => {
         const address = o.shipping_address
           ? `${o.shipping_address.address1 || ''}, ${o.shipping_address.city || ''}, ${o.shipping_address.province || ''}, ${o.shipping_address.country || ''}, ${o.shipping_address.zip || ''}`
           : '';
-        
-        // Calculate the total quantity safely
+
         let itemCount = 0;
         if (Array.isArray(o.line_items)) {
           itemCount = o.line_items.reduce((total, item) => total + item.quantity, 0);
@@ -264,17 +262,13 @@ app.post('/api/sync-orders', async (req, res) => {
 
         if (exists.length) {
           await pool.execute(
-            `UPDATE order_progress SET item_count = ?, updated_at = NOW() WHERE order_id = ?`,
+            "UPDATE `order_progress` SET `item_count` = ?, `updated_at` = NOW() WHERE `order_id` = ?",
             [itemCount, orderId]
           );
         } else {
           const shopifyCreatedAt = new Date(o.created_at);
           await pool.execute(
-            `INSERT INTO order_progress (
-              order_id, order_name, customer_name,
-              total_price, fulfillment_status, payment_status,
-              shipping_method, item_count, tags, address, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            "INSERT INTO `order_progress` (`order_id`, `order_name`, `customer_name`, `total_price`, `fulfillment_status`, `payment_status`, `shipping_method`, `item_count`, `tags`, `address`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
               orderId, o.name, customerName,
               o.total_price || 0,

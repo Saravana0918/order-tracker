@@ -469,7 +469,7 @@ document.addEventListener('DOMContentLoaded', loadWeeklyPendingTable);
 
 async function loadDispatchSummary(){
   try{
-    const res = await fetch('/api/dispatch-summary-upcoming');
+    const res = await fetch('/api/dispatch-details-upcoming');
     const data = await res.json();
 
     const header = document.getElementById('dispatch-summary-header');

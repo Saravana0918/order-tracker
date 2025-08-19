@@ -235,19 +235,20 @@ app.get('/api/dispatch-details-upcoming', async (req, res) => {
     const [rows] = await pool.query(`
       SELECT
         DATE_FORMAT(dispatch_date, '%Y-%m-%d') AS date,
-        order_id,
-        order_name,
-        COALESCE(total_quantity, item_count, 0) AS quantity
+        COUNT(DISTINCT order_id) AS order_count,
+        SUM(COALESCE(total_quantity, item_count, 0)) AS total_quantity
       FROM order_progress
       WHERE dispatch_date BETWEEN CURDATE() AND (CURDATE() + INTERVAL 6 DAY)
-      ORDER BY dispatch_date ASC, order_id ASC
+      GROUP BY DATE_FORMAT(dispatch_date, '%Y-%m-%d')
+      ORDER BY date ASC
     `);
     res.json({ rows });
   } catch (err) {
-    console.error('dispatch details error:', err);
+    console.error('dispatch summary error:', err);
     res.status(500).json({ error: 'DB Error' });
   }
 });
+
 
 
 

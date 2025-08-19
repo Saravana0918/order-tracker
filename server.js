@@ -230,7 +230,8 @@ app.get('/api/orders', async (req, res) => {
 });
 
 // -------- Dispatch Details (Next 7 Days): Date | Order ID | Quantity --------
-app.get('/api/dispatch-details-upcoming', async (req, res) => {
+// Dispatch Summary (Next 7 Days)
+app.get('/api/dispatch-summary-upcoming', async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT
@@ -248,8 +249,6 @@ app.get('/api/dispatch-details-upcoming', async (req, res) => {
     res.status(500).json({ error: 'DB Error' });
   }
 });
-
-
 
 
 /* -------- Sync Shopify Orders (Manual Refresh) -------- */

@@ -119,31 +119,37 @@
     </table>
   </div>
   
-<h4 class="mt-4 d-flex align-items-center justify-content-between">
-  Dispatch Summary (Next 7 Days)
-  <button class="btn btn-secondary btn-sm mb-2" onclick="loadDispatchUpcomingTable()">Refresh</button>
-</h4>
+  <!-- ======= MANAGER VIEW: DISPATCH SUMMARY (Next 7 Days) ======= -->
+  <h4 class="mt-4 d-flex align-items-center justify-content-between">
+    Dispatch Summary (Next 7 Days)
+    <button class="btn btn-secondary btn-sm mb-2" onclick="loadDispatchSummaryTable()">Refresh</button>
+  </h4>
+  <div class="table-responsive">
+    <table class="table table-bordered text-center">
+      <thead>
+        <tr id="dispatch-summary-header"></tr>
+      </thead>
+      <tbody id="dispatch-summary-body"></tbody>
+    </table>
+  </div>
 
-<div class="table-responsive">
-  <table class="table table-bordered text-center">
-    <thead><tr id="dispatch-up-header"></tr></thead>
-    <tbody id="dispatch-up-body"></tbody>
-  </table>
-</div>
-
-<h3>Orders Summary (Next 7 Days)</h3>
-<table id="dispatchSummaryTable" border="1" cellspacing="0" cellpadding="5">
-  <thead>
-    <tr>
-      <th>Date</th>
-      <th>Number of Orders</th>
-      <th>Total Quantity</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
-
-
+  <!-- ======= MANAGER VIEW: DISPATCH DETAILS (Next 7 Days) ======= -->
+  <h4 class="mt-4 d-flex align-items-center justify-content-between">
+    Dispatch Details (Next 7 Days)
+    <button class="btn btn-secondary btn-sm mb-2" onclick="loadDispatchDetailsTable()">Refresh</button>
+  </h4>
+  <div class="table-responsive">
+    <table class="table table-bordered text-center">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Order ID</th>
+          <th>Quantity (Items)</th>
+        </tr>
+      </thead>
+      <tbody id="dispatch-details-body"></tbody>
+    </table>
+  </div>
 
   <!-- ORDER TABLE -->
   <div class="card p-3" id="mainTableSection">
@@ -228,20 +234,9 @@ function checkLogin(){
   }
 }
 
-function parseDateString(dateStr) {
-  return new Date(dateStr);
-}
-
-function isReadyForDesign(o) {
-  // hide when BOTH are set
-  return Boolean(o.dispatch_date) && Boolean(o.design_assignee);
-}
-
-function baseCustomerFilter(list) {
-  // for customer: show only NOT-ready orders
-  if (userRole === 'customer') return list.filter(o => !isReadyForDesign(o));
-  return list;
-}
+function parseDateString(dateStr) { return new Date(dateStr); }
+function isReadyForDesign(o) { return Boolean(o.dispatch_date) && Boolean(o.design_assignee); }
+function baseCustomerFilter(list) { return (userRole === 'customer') ? list.filter(o => !isReadyForDesign(o)) : list; }
 
 /* ───────────── Column visibility ───────────── */
 function applyRoleVisibility(){
@@ -266,12 +261,11 @@ function toInputDate(d){
 }
 
 /* ───────────── API: Save Dispatch Date ───────────── */
-// Save Dispatch Date (search-aware + customer auto-hide when both set)
 async function saveDispatchDate(orderId){
   const inp = document.querySelector(`input[data-dispatch-input="${orderId}"]`);
   if(!inp) return alert('Date input not found for this row.');
 
-  const date = (inp.value || '').trim();   // yyyy-mm-dd from <input type="date">
+  const date = (inp.value || '').trim();
   if(!date){ alert('Please choose a dispatch date'); return; }
 
   const prevDisabled = inp.disabled; 
@@ -286,7 +280,6 @@ async function saveDispatchDate(orderId){
     const d = await res.json();
 
     if (res.ok && (d.success || d.ok)) {
-      // update local cache
       const idStr = String(orderId);
       allOrders = allOrders.map(o =>
         (String(o.order_id) === idStr || String(o.order_name) === idStr)
@@ -294,15 +287,9 @@ async function saveDispatchDate(orderId){
           : o
       );
 
-      // recompute filtered view:
-      // - if searching → show matches from ALL orders (even hidden ones)
-      // - else:
-      //   * design_user → only their orders
-      //   * customer    → hide orders that have BOTH date & assignee
-      //   * others      → show all
       const q = (document.getElementById('searchInput')?.value || '').trim();
       if (q) {
-        filterOrders(); // your search already looks at allOrders
+        filterOrders();
       } else {
         if (userRole && userRole.startsWith('design_user')) {
           filteredOrders = allOrders.filter(o => o.design_assignee === username);
@@ -314,9 +301,10 @@ async function saveDispatchDate(orderId){
         renderTable();
       }
 
-      loadDispatchUpcomingTable();
+      // Refresh manager tables
+      loadDispatchSummaryTable();
+      loadDispatchDetailsTable();
 
-      // visual cue
       inp.classList.add('date-saved');
       setTimeout(()=> inp.classList.remove('date-saved'), 1200);
     } else {
@@ -330,41 +318,38 @@ async function saveDispatchDate(orderId){
   }
 }
 
-
-
-async function loadDispatchUpcomingTable() {
+/* ───────────── MANAGER TABLES ───────────── */
+// Summary = date, orders count, total qty
+async function loadDispatchSummaryTable() {
   try {
     const res = await fetch('/api/dispatch-summary-upcoming');
     const data = await res.json();
-    if (!data?.length) return;
+    const rows = data?.rows || data || [];
 
-    const header = document.getElementById('dispatch-up-header');
-    const body   = document.getElementById('dispatch-up-body');
+    const header = document.getElementById('dispatch-summary-header');
+    const body   = document.getElementById('dispatch-summary-body');
 
-    // Columns exactly like Weekly Summary
-    const cols = [
-      'date', 'srikanth', 'kushi', 'shravanthi', 'mahesh', 'pawan',
-      'printing_user', 'fusing_user', 'stitching_user', 'shipping_user', 'total'
-    ];
-
-    header.innerHTML = cols.map(c => `<th>${c}</th>`).join('');
+    header.innerHTML = `
+      <th>Date</th>
+      <th>Number of Orders</th>
+      <th>Total Quantity</th>
+    `;
     body.innerHTML = '';
 
-    data.forEach(r => {
-      const tds = cols.map(k => `<td>${r[k] ?? 0}</td>`).join('');
-      body.innerHTML += `<tr>${tds}</tr>`;
+    rows.forEach(r => {
+      body.innerHTML += `
+        <tr>
+          <td>${r.date}</td>
+          <td>${r.order_count ?? 0}</td>
+          <td>${r.total_quantity ?? 0}</td>
+        </tr>`;
     });
   } catch (e) {
-    console.error('loadDispatchUpcomingTable error:', e);
+    console.error('loadDispatchSummaryTable error:', e);
   }
 }
 
-// load on page load with others
-document.addEventListener('DOMContentLoaded', () => {
-  loadDispatchUpcomingTable();
-  loadDispatchDetailsTable();
-});
-
+// Details = date, order id, qty
 async function loadDispatchDetailsTable(){
   try{
     const res = await fetch('/api/dispatch-details-upcoming');
@@ -376,7 +361,7 @@ async function loadDispatchDetailsTable(){
       body.innerHTML += `
         <tr>
           <td>${r.date}</td>
-          <td>${r.order_name || r.order_id}</td>
+          <td>${r.order_name || ('#' + r.order_id)}</td>
           <td>${r.quantity ?? 0}</td>
         </tr>`;
     });
@@ -384,7 +369,6 @@ async function loadDispatchDetailsTable(){
     console.error('loadDispatchDetailsTable error:', e);
   }
 }
-
 
 /* ───────────── Fetch orders ───────────── */
 async function loadOrders() {
@@ -403,15 +387,13 @@ async function loadOrders() {
   allOrders = data.orders || [];
 
   if (userRole && userRole.startsWith('design_user')) {
-  filteredOrders = allOrders.filter(o => o.design_assignee === username);
+    filteredOrders = allOrders.filter(o => o.design_assignee === username);
   } else {
-    // 👇 customer hides “ready” orders by default
     filteredOrders = baseCustomerFilter(allOrders);
   }
 
   renderTable();
 
-  // Only admin/customer see counts
   const statsWrap = document.getElementById('dailyStatsWrapper');
   if (userRole === 'admin' || userRole === 'customer') {
     if (statsWrap) statsWrap.style.display = 'block';
@@ -454,7 +436,7 @@ async function loadWeeklyPendingTable() {
     headerRow.innerHTML = '';
     body.innerHTML = '';
 
-    const keys = Object.keys(data[0]); // e.g., ["date", "srikanth", ...]
+    const keys = Object.keys(data[0]);
     headerRow.innerHTML = `<th>Date</th>` + keys.slice(1).map(k => `<th>${k}</th>`).join('');
 
     data.forEach(row => {
@@ -467,30 +449,6 @@ async function loadWeeklyPendingTable() {
   }
 }
 document.addEventListener('DOMContentLoaded', loadWeeklyPendingTable);
-
-async function loadDispatchSummary() {
-    try {
-      const res = await fetch('/api/dispatch-summary-upcoming');
-      const data = await res.json();
-      const tbody = document.querySelector('#dispatchSummaryTable tbody');
-      tbody.innerHTML = '';
-
-      data.rows.forEach(row => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${row.date}</td>
-          <td>${row.order_count}</td>
-          <td>${row.total_quantity}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-    } catch (err) {
-      console.error('Error loading summary:', err);
-    }
-  }
-
-  loadDispatchSummary();
-
 
 /* ───────────── Show User Orders ───────────── */
 async function showUserOrders(username) {
@@ -544,26 +502,21 @@ async function showUserOrders(username) {
 
 /* ───────────── Search filter ───────────── */
 function filterOrders(){
-
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
 
   if (!q) {
-    // no query → apply base (role-aware) filter
     if (userRole && userRole.startsWith('design_user')) {
       filteredOrders = allOrders.filter(o => o.design_assignee === username);
     } else {
       filteredOrders = baseCustomerFilter(allOrders);
     }
   } else {
-    // query present → search across ALL orders (even hidden ones)
     filteredOrders = allOrders.filter(o=>{
       const oid = (o.order_name || o.order_id || '').toString().toLowerCase();
       return oid.includes(q);
     });
   }
-
   renderTable();
-  
 }
 
 // ───────── Daily Counts ─────────
@@ -615,7 +568,6 @@ function renderDailyCounts(orders){
 }
 
 /* ───────────── Assign designer ───────────── */
-// Assign / Reassign Designer (instant UI + customer auto-hide + search-aware)
 async function assignDesigner(orderId){
   const select   = document.querySelector(`select[data-order-id="${orderId}"]`);
   const designer = select?.value;
@@ -631,7 +583,6 @@ async function assignDesigner(orderId){
   if (res.ok && data.success){
     alert('Assigned successfully!');
 
-    // update local cache (no full reload)
     const idStr = String(orderId);
     allOrders = allOrders.map(o =>
       (String(o.order_id) === idStr || String(o.order_name) === idStr)
@@ -639,7 +590,6 @@ async function assignDesigner(orderId){
         : o
     );
 
-    // same recompute rules as saveDispatchDate()
     const q = (document.getElementById('searchInput')?.value || '').trim();
     if (q) {
       filterOrders();
@@ -654,13 +604,13 @@ async function assignDesigner(orderId){
       renderTable();
     }
 
-    loadDispatchUpcomingTable();
+    // refresh manager tables
+    loadDispatchSummaryTable();
     loadDispatchDetailsTable();
   } else {
     alert(data?.error || 'Assignment failed');
   }
 }
-
 
 /* ───────────── Preview & upload helper ───────────── */
 function preview(id){
@@ -691,7 +641,9 @@ async function quickDone(orderId) {
   if (data.success) {
     alert('Marked as Done!');
     await loadOrders();
-    loadDispatchUpcomingTable();
+    // refresh manager tables
+    loadDispatchSummaryTable();
+    loadDispatchDetailsTable();
   } else {
     alert('Failed to update. Please try again.');
   }
@@ -799,8 +751,6 @@ function renderTable(){
       else if (stages.includes(col)) {
         value = getStatusBadge(r[col + '_done']);
       }
-
-      // --- Dispatch date BEFORE assignee; date change enables assignee
       else if (col === 'dispatch_date') {
         const current = toInputDate(r.dispatch_date);
         if (userRole === 'admin' || userRole === 'customer'){
@@ -820,8 +770,6 @@ function renderTable(){
           value = current || '-';
         }
       }
-
-      // --- Design assignee (disabled until date set)
       else if (col==='design_assignee'){
         if (userRole==='admin' || userRole==='customer'){
           const hasDate = Boolean(r.dispatch_date);
@@ -849,18 +797,15 @@ function renderTable(){
           value = r.design_assignee ? `<span class="badge badge-assign">${r.design_assignee}</span>` : '-';
         }
       }
-
       else if (col==='design_preview'){
         value = r.design_image
           ? `<img src="/uploads/design/${r.design_image}" style="max-width:90px;border:1px solid #ccc;cursor:pointer"
                  title="Click to enlarge" onclick="window.open('/uploads/design/${r.design_image}','_blank')">`
           : '-';
       }
-
       else if (col==='updated') {
         value = new Date(r.created_at).toLocaleString();
       }
-
       else if (col==='actions'){
         if (userRole.startsWith('design') && !r.design_done && r.design_assignee===username){
           value=`
@@ -878,13 +823,9 @@ function renderTable(){
           (userRole==='stitching' && !r.stitching_done)||
           (userRole==='shipping'  && !r.shipping_done)
         ){
-          value=`
-            <button class="btn btn-sm btn-success" onclick="quickDone('${r.order_id}')">
-              Mark as Done
-            </button>`;
+          value=`<button class="btn btn-sm btn-success" onclick="quickDone('${r.order_id}')">Mark as Done</button>`;
         }
       }
-
       else {
         value = r[col] ?? '-';
       }
@@ -896,12 +837,9 @@ function renderTable(){
     tbody.appendChild(tr);
   });
 
-  document.getElementById('orderCountText').innerText =
-    `Showing ${filteredOrders.length} orders`;
-
+  document.getElementById('orderCountText').innerText = `Showing ${filteredOrders.length} orders`;
   applyRoleVisibility();
 }
-
 
 window.onload = async () => {
   checkLogin();
@@ -909,6 +847,9 @@ window.onload = async () => {
   if (userRole === 'admin' || userRole === 'customer') {
     await loadWeeklySummary();
   }
+  // load manager tables by default
+  loadDispatchSummaryTable();
+  loadDispatchDetailsTable();
 };
 </script>
 </body>

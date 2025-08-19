@@ -132,7 +132,16 @@
 </div>
 
 
-
+<h4 class="mt-4 d-flex align-items-center justify-content-between">
+    Orders Summary (Next 7 Days)
+    <button class="btn btn-secondary btn-sm mb-2" onclick="loadOrdersSummaryTable()">Refresh</button>
+</h4>
+<div class="table-responsive">
+    <table class="table table-bordered text-center">
+        <thead><tr id="orders-summary-header"></tr></thead>
+        <tbody id="orders-summary-body"></tbody>
+    </table>
+</div>
 
   <!-- ORDER TABLE -->
   <div class="card p-3" id="mainTableSection">
@@ -457,6 +466,28 @@ async function loadDispatchSummaryTable() {
   }
 }
 
+async function loadOrdersSummaryTable() {
+    try {
+        const res = await fetch('/api/orders-summary-metrics');
+        const data = await res.json();
+        if (!data?.length) return;
+
+        const header = document.getElementById('orders-summary-header');
+        const body = document.getElementById('orders-summary-body');
+
+        const cols = ['date', 'number_of_orders', 'total_quantity'];
+
+        header.innerHTML = cols.map(c => `<th>${c.replace(/_/g, ' ')}</th>`).join('');
+        body.innerHTML = '';
+
+        data.forEach(r => {
+            const tds = cols.map(k => `<td>${r[k] ?? 0}</td>`).join('');
+            body.innerHTML += `<tr>${tds}</tr>`;
+        });
+    } catch (e) {
+        console.error('loadOrdersSummaryTable error:', e);
+    }
+}
 
 /* ───────────── Show User Orders ───────────── */
 async function showUserOrders(username) {

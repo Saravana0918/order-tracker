@@ -231,62 +231,71 @@ app.get('/api/orders', async (req, res) => {
 
 /* -------- Sync Shopify Orders (Manual Refresh) -------- */
 app.post('/api/sync-orders', async (req, res) => {
-        try {
-        const shopifyRes = await axios.get(
-        `https://${SHOPIFY_STORE}/admin/api/2023-10/orders.json`,
-        {
-        headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_API_TOKEN },
-        params: { status: 'any', limit: 50 }
-        }
-        );
+  try {
+    const shopifyRes = await axios.get(
+      `https://${SHOPIFY_STORE}/admin/api/2023-10/orders.json`,
+      {
+        headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_API_TOKEN },
+        params: { status: 'any', limit: 50 }
+      }
+    );
 
-        let imported = 0;
+    let imported = 0;
 
-        for (const o of shopifyRes.data.orders) {
-        const orderId = o.id.toString();
-        const [exists] = await pool.execute(
-        'SELECT 1 FROM order_progress WHERE order_id = ?',
-        [orderId]
-        );
+    for (const o of shopifyRes.data.orders) {
+      const orderId = o.id.toString();
+      const [exists] = await pool.execute(
+        'SELECT 1 FROM order_progress WHERE order_id = ?',
+        [orderId]
+      );
 
-        const customerName = `${o.customer?.first_name || ''} ${o.customer?.last_name || ''}`.trim();
-        const address = o.shipping_address
-        ? `${o.shipping_address.address1 || ''}, ${o.shipping_address.city || ''}, ${o.shipping_address.province || ''}, ${o.shipping_address.country || ''}, ${o.shipping_address.zip || ''}`
-        : '';
-              
-              const itemCount = o.line_items.reduce((total, item) => total + item.quantity, 0);
+      const customerName = `${o.customer?.first_name || ''} ${o.customer?.last_name || ''}`.trim();
+      const address = o.shipping_address
+        ? `${o.shipping_address.address1 || ''}, ${o.shipping_address.city || ''}, ${o.shipping_address.province || ''}, ${o.shipping_address.country || ''}, ${o.shipping_address.zip || ''}`
+        : '';
+      
+      // Calculate the total quantity correctly
+      const itemCount = o.line_items.reduce((total, item) => total + item.quantity, 0);
 
-        if (!exists.length) {
-        const shopifyCreatedAt = new Date(o.created_at);
+      if (exists.length) {
+        // If the order already exists, update its item_count
+        await pool.execute(
+          `UPDATE order_progress SET item_count = ?, updated_at = NOW() WHERE order_id = ?`,
+          [itemCount, orderId]
+        );
+      } else {
+        // If the order is new, insert it
+        const shopifyCreatedAt = new Date(o.created_at);
+        
+        await pool.execute(
+          `INSERT INTO order_progress (
+            order_id, order_name, customer_name,
+            total_price, fulfillment_status, payment_status,
+            shipping_method, item_count, tags, address, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            orderId, o.name, customerName,
+            o.total_price || 0,
+            o.fulfillment_status || '',
+            o.financial_status || '',
+            o.shipping_lines?.[0]?.title || '',
+            itemCount,
+            o.tags || '',
+            address,
+            shopifyCreatedAt,
+            shopifyCreatedAt
+          ]
+        );
+        imported++;
+      }
+    }
 
-        await pool.execute(
-        `INSERT INTO order_progress (
-        order_id, order_name, customer_name,
-        total_price, fulfillment_status, payment_status,
-        shipping_method, item_count, tags, address, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-        orderId, o.name, customerName,
-        o.total_price || 0,
-        o.fulfillment_status || '',
-        o.financial_status || '',
-        o.shipping_lines?.[0]?.title || '',
-        itemCount, // Use the calculated item count
-        o.tags || '',
-        address,
-        shopifyCreatedAt,
-        shopifyCreatedAt
-        ]
-        );
-        imported++;
-        }
-        }
-
-        res.json({ success: true, imported });
-        } catch (err) {
-        console.error('Sync error:', err);
-        res.status(500).json({ success: false, error: 'Shopify sync failed' });}
-        });
+    res.json({ success: true, imported });
+  } catch (err) {
+    console.error('Sync error:', err);
+    res.status(500).json({ success: false, error: 'Shopify sync failed' });
+  }
+});
 
 // ---------------- ORDERS SUMMARY METRICS (UPCOMING 7 DAYS) ----------------
 app.get('/api/orders-summary-metrics', async (req, res) => {

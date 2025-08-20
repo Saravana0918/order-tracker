@@ -299,19 +299,21 @@ async function saveDispatchDate(orderId){
     const d = await res.json();
 
     if (res.ok && (d.success || d.ok)) {
-      // update local cache
+      // ✅ 1. Update allOrders cache
       const idStr = String(orderId);
       allOrders = allOrders.map(o =>
         (String(o.order_id) === idStr || String(o.order_name) === idStr)
           ? { ...o, dispatch_date: date }
           : o
       );
-      // re-render the table to show the new date
-      renderTable();
-      
-      // visual cue
-      inp.classList.add('date-saved');
-      setTimeout(()=> inp.classList.remove('date-saved'), 1200);
+
+      // ✅ 2. Update UI directly (instead of re-rendering everything)
+      const cell = inp.closest("td");  
+      if (cell) {
+        // Replace with just plain text after save
+        cell.innerHTML = `<span class="text-success fw-bold">${date}</span>`;
+      }
+
     } else {
       alert(d?.error || 'Failed to save dispatch date');
     }
@@ -322,6 +324,7 @@ async function saveDispatchDate(orderId){
     inp.disabled = prevDisabled;
   }
 }
+
 
 async function loadDispatchUpcomingTable() {
   try {

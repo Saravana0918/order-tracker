@@ -574,38 +574,36 @@ function renderDailyCounts(orders){
 
   const byDay = {};
   for (const o of orders){
-    const d = o.created_at || o.createdAt || o.updated_at;
-    if (!d) continue;
-    const key = dayKeyLocal(d);
+    if (!o.created_at) continue; // use only created_at for consistency
+    const key = dayKeyLocal(o.created_at);
     byDay[key] = (byDay[key] || 0) + 1;
   }
 
   const cToday = byDay[todayStr] || 0;
 
-  const y = new Date(today); y.setDate(y.getDate()-1);
+  const y = new Date(today); 
+  y.setDate(y.getDate()-1);
   const cYday = byDay[dayKeyLocal(y)] || 0; 
 
   let c7 = 0;
   for (let i=0;i<7;i++){
-    const d = new Date(today); d.setDate(d.getDate()-i);
+    const d = new Date(today); 
+    d.setDate(d.getDate()-i);
     c7 += (byDay[dayKeyLocal(d)] || 0);
   }
 
   const mStart = new Date(today.getFullYear(), today.getMonth(), 1);
   let cMonth = 0;
   Object.keys(byDay).forEach(k=>{
-    const kd = new Date(k);
-    if (kd >= mStart && kd <= today) cMonth += byDay[k];
+    if (k >= dayKeyLocal(mStart) && k <= todayStr) cMonth += byDay[k];
   });
 
-  const tEl = document.getElementById('countToday');
-  if (!tEl) return;
-
-  tEl.textContent = cToday;
-  document.getElementById('countYday').textContent  = cYday;
-  document.getElementById('count7').textContent     = c7;
-  document.getElementById('countMonth').textContent = cMonth;
+  document.getElementById('countToday').textContent  = cToday;
+  document.getElementById('countYday').textContent   = cYday;
+  document.getElementById('count7').textContent      = c7;
+  document.getElementById('countMonth').textContent  = cMonth;
 }
+
 
 /* ───────────── Assign designer ───────────── */
 // Assign / Reassign Designer (instant UI + customer auto-hide + search-aware)

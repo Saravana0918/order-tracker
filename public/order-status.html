@@ -284,7 +284,7 @@ async function saveDispatchDate(orderId){
   const inp = document.querySelector(`input[data-dispatch-input="${orderId}"]`);
   if(!inp) return alert('Date input not found for this row.');
 
-  const date = (inp.value || '').trim();   // yyyy-mm-dd from <input type="date">
+  const date = (inp.value || '').trim();
   if(!date){ alert('Please choose a dispatch date'); return; }
 
   const prevDisabled = inp.disabled; 
@@ -306,29 +306,9 @@ async function saveDispatchDate(orderId){
           ? { ...o, dispatch_date: date }
           : o
       );
-
-      // recompute filtered view:
-      // - if searching → show matches from ALL orders (even hidden ones)
-      // - else:
-      //   * design_user → only their orders
-      //   * customer    → hide orders that have BOTH date & assignee
-      //   * others      → show all
-      const q = (document.getElementById('searchInput')?.value || '').trim();
-      if (q) {
-        filterOrders(); // your search already looks at allOrders
-      } else {
-        if (userRole && userRole.startsWith('design_user')) {
-          filteredOrders = allOrders.filter(o => o.design_assignee === username);
-        } else if (userRole === 'customer') {
-          filteredOrders = allOrders.filter(o => !(o.dispatch_date && o.design_assignee));
-        } else {
-          filteredOrders = [...allOrders];
-        }
-        renderTable();
-      }
-
-      loadDispatchUpcomingTable();
-
+      // re-render the table to show the new date
+      renderTable();
+      
       // visual cue
       inp.classList.add('date-saved');
       setTimeout(()=> inp.classList.remove('date-saved'), 1200);
@@ -342,8 +322,6 @@ async function saveDispatchDate(orderId){
     inp.disabled = prevDisabled;
   }
 }
-
-
 
 async function loadDispatchUpcomingTable() {
   try {

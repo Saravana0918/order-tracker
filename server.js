@@ -83,40 +83,28 @@ app.post('/api/upload-design', upload.single('image'), async (req, res) => {
 
 // /api/set-dispatch-date
 app.post('/api/set-dispatch-date', async (req, res) => {
-  try {
-    const { order_id, dispatch_date } = req.body;
-    if (!order_id || !dispatch_date) {
-      return res.status(400).json({ error: 'order_id and dispatch_date are required' });
-    }
+  try {
+    const { order_id, dispatch_date } = req.body;
+    if (!order_id || !dispatch_date) {
+      return res.status(400).json({ error: 'order_id and dispatch_date are required' });
+    }
 
-    // Normalize: dd-mm-yyyy → yyyy-mm-dd; allow yyyy-mm-dd pass-through
-    const toISO = (s) => {
-      if (!s) return null;
-      const ddmmyyyy = /^(\d{2})-(\d{2})-(\d{4})$/;   // 17-08-2025
-      const yyyymmdd = /^(\d{4})-(\d{2})-(\d{2})$/;   // 2025-08-17
-      if (ddmmyyyy.test(s)) {
-        const [, dd, mm, yyyy] = s.match(ddmmyyyy);
-        return `${yyyy}-${mm}-${dd}`;
-      }
-      if (yyyymmdd.test(s)) return s;
-      return null;
-    };
+    // Date validation (optional but good practice)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dispatch_date)) {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
 
-    const iso = toISO(dispatch_date);
-    if (!iso) return res.status(400).json({ error: 'Invalid date format' });
+    await pool.execute(
+      'UPDATE `order_progress` SET `dispatch_date` = ? WHERE `order_id` = ?',
+      [dispatch_date, order_id]
+    );
 
-    await pool.execute(
-      'UPDATE order_progress SET dispatch_date = ? WHERE order_id = ?',
-      [iso, order_id]
-    );
-
-    return res.json({ ok: true, dispatch_date: iso });
-  } catch (e) {
-    console.error('set-dispatch-date error', e);
-    return res.status(500).json({ error: 'Server error' });
-  }
+    return res.json({ ok: true, dispatch_date: dispatch_date });
+  } catch (e) {
+    console.error('set-dispatch-date error', e);
+    return res.status(500).json({ error: 'Server error' });
+  }
 });
-
 
 
 /* -------- Assign designer -------- */

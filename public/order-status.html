@@ -361,6 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 /* ───────────── Fetch orders ───────────── */
+/* ───────────── Fetch orders ───────────── */
 async function loadOrders() {
   userRole = localStorage.getItem('role');
   username = localStorage.getItem('username');
@@ -376,8 +377,11 @@ async function loadOrders() {
   const data = await res.json();
   allOrders = data.orders || [];
 
-  if (userRole && userRole.startsWith('design_user')) {
-  filteredOrders = allOrders.filter(o => o.design_assignee === username);
+  if (userRole === 'design') { // Check for 'design' role specifically
+    // Show only orders assigned to the current user OR orders with no assignee
+    filteredOrders = allOrders.filter(o => !o.design_assignee || o.design_assignee === username);
+  } else if (userRole.startsWith('design_user')) { // Your original logic
+    filteredOrders = allOrders.filter(o => o.design_assignee === username);
   } else {
     // 👇 customer hides “ready” orders by default
     filteredOrders = baseCustomerFilter(allOrders);

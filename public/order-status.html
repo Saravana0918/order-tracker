@@ -361,42 +361,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 /* ───────────── Fetch orders ───────────── */
-/* ───────────── Fetch orders ───────────── */
-/* ───────────── Fetch orders ───────────── */
-async function loadOrders() {
-  userRole = localStorage.getItem('role');
-  username = localStorage.getItem('username');
-
-  if (!username || !userRole) {
-    alert('User session not found. Please log in again.');
-    return;
-  }
-
-  const res = await fetch('/api/orders', {
-    headers: { 'x-user-role': userRole, 'x-user-name': username }
-  });
-  const data = await res.json();
-  allOrders = data.orders || [];
-
-  if (userRole && userRole.startsWith('design_user')) {
-    // Show ONLY orders assigned to the current user
-    filteredOrders = allOrders.filter(o => o.design_assignee === username);
-  } else {
-    // 👇 customer hides “ready” orders by default
-    filteredOrders = baseCustomerFilter(allOrders);
-  }
-
-  renderTable();
-
-  // Only admin/customer see counts
-  const statsWrap = document.getElementById('dailyStatsWrapper');
-  if (userRole === 'admin' || userRole === 'customer') {
-    if (statsWrap) statsWrap.style.display = 'block';
-    renderDailyCounts(allOrders);
-  } else if (statsWrap) {
-    statsWrap.style.display = 'none';
-  }
+function normalizeRole(raw) {
+  const r = (raw || '').toLowerCase();
+  if (r.startsWith('design'))   return 'design';
+  if (r.startsWith('printing')) return 'printing';
+  if (r.startsWith('fusing'))   return 'fusing';
+  if (r.startsWith('stitching'))return 'stitching';
+  if (r.startsWith('shipping')) return 'shipping';
+  if (r.startsWith('admin'))    return 'admin';
+  if (r.startsWith('customer')) return 'customer';
+  return r;
 }
+
+async function loadOrders() {
+  const rawRole = localStorage.getItem('role');
+  username = localStorage.getItem('username');
+  userRole = normalizeRole(rawRole);
+
+  if (!username || !userRole) {
+    alert('User session not found. Please log in again.');
+    return;
+  }
+
+  const res = await fetch('/api/orders', {
+    headers: { 'x-user-role': userRole, 'x-user-name': username }
+  });
+  const data = await res.json();
+  allOrders = data.orders || [];
+
+  // FE guard (still keep)
+  if (userRole === 'design') {
+    filteredOrders = allOrders.filter(o => o.design_assignee === username);
+  } else {
+    filteredOrders = allOrders; // requirement: admin + customer see ALL
+    // if you still want customer base filter, put it back here.
+    // filteredOrders = (userRole === 'customer') ? baseCustomerFilter(allOrders) : allOrders;
+  }
+
+  renderTable();
+
+  const statsWrap = document.getElementById('dailyStatsWrapper');
+  if (userRole === 'admin' || userRole === 'customer') {
+    if (statsWrap) statsWrap.style.display = 'block';
+    renderDailyCounts(allOrders);
+  } else if (statsWrap) {
+    statsWrap.style.display = 'none';
+  }
+}
+
 
 async function loadWeeklySummary() {
   try {

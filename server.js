@@ -159,7 +159,16 @@ app.post('/api/mark-stage-done', async (req, res) => {
 
 /* -------- Fetch Orders (Fast) -------- */
 app.get('/api/orders', async (req, res) => {
-  const role = req.headers['x-user-role'];
+  const rawRole = (req.headers['x-user-role'] || '').toLowerCase();
+  const role =
+    rawRole.startsWith('design')   ? 'design'   :
+    rawRole.startsWith('printing') ? 'printing' :
+    rawRole.startsWith('fusing')   ? 'fusing'   :
+    rawRole.startsWith('stitching')? 'stitching':
+    rawRole.startsWith('shipping') ? 'shipping' :
+    rawRole.startsWith('admin')    ? 'admin'    :
+    rawRole.startsWith('customer') ? 'customer' : rawRole;
+
   const user = req.headers['x-user-name'];
 
   try {
@@ -180,21 +189,18 @@ app.get('/api/orders', async (req, res) => {
         fusing_done,
         stitching_done,
         shipping_done,
-        created_at,                -- Shopify created_at
+        created_at,
         design_image,
         design_assignee,
-        DATE_FORMAT(dispatch_date, '%Y-%m-%d') AS dispatch_date   -- ✅ add this line
+        DATE_FORMAT(dispatch_date, '%Y-%m-%d') AS dispatch_date
       FROM order_progress
       WHERE 1=1
     `;
-
     const params = [];
 
     if (role === 'design') {
-      sql += `
-        AND design_done = 0
-        AND (design_assignee = ? OR (design_assignee IS NULL AND DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))))
-      `;
+      // ONLY show orders assigned to this designer. Never show unassigned.
+      sql += ` AND design_done = 0 AND design_assignee = ? `;
       params.push(user);
     } else if (role === 'printing') {
       sql += ` AND design_done = 1 AND printing_done = 0 `;
@@ -205,16 +211,18 @@ app.get('/api/orders', async (req, res) => {
     } else if (role === 'shipping') {
       sql += ` AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0 `;
     }
+    // admin & customer → no extra filter (show all)
 
     sql += ' ORDER BY created_at DESC';
+
     const [rows] = await pool.execute(sql, params);
     res.json({ orders: rows });
-
   } catch (err) {
     console.error('❌ Error loading orders:', err);
     res.status(500).json({ error: 'Failed to load orders' });
   }
 });
+
 
 
 /* -------- Sync Shopify Orders (Manual Refresh) -------- */

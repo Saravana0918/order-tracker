@@ -362,41 +362,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /* ───────────── Fetch orders ───────────── */
 /* ───────────── Fetch orders ───────────── */
+/* ───────────── Fetch orders ───────────── */
 async function loadOrders() {
-  userRole = localStorage.getItem('role');
-  username = localStorage.getItem('username');
+  userRole = localStorage.getItem('role');
+  username = localStorage.getItem('username');
 
-  if (!username || !userRole) {
-    alert('User session not found. Please log in again.');
-    return;
-  }
+  if (!username || !userRole) {
+    alert('User session not found. Please log in again.');
+    return;
+  }
 
-  const res = await fetch('/api/orders', {
-    headers: { 'x-user-role': userRole, 'x-user-name': username }
-  });
-  const data = await res.json();
-  allOrders = data.orders || [];
+  const res = await fetch('/api/orders', {
+    headers: { 'x-user-role': userRole, 'x-user-name': username }
+  });
+  const data = await res.json();
+  allOrders = data.orders || [];
 
-  if (userRole === 'design') { // Check for 'design' role specifically
-    // Show only orders assigned to the current user OR orders with no assignee
-    filteredOrders = allOrders.filter(o => !o.design_assignee || o.design_assignee === username);
-  } else if (userRole.startsWith('design_user')) { // Your original logic
+  if (userRole && userRole.startsWith('design_user')) {
+    // Show ONLY orders assigned to the current user
     filteredOrders = allOrders.filter(o => o.design_assignee === username);
-  } else {
-    // 👇 customer hides “ready” orders by default
-    filteredOrders = baseCustomerFilter(allOrders);
-  }
+  } else {
+    // 👇 customer hides “ready” orders by default
+    filteredOrders = baseCustomerFilter(allOrders);
+  }
 
-  renderTable();
+  renderTable();
 
-  // Only admin/customer see counts
-  const statsWrap = document.getElementById('dailyStatsWrapper');
-  if (userRole === 'admin' || userRole === 'customer') {
-    if (statsWrap) statsWrap.style.display = 'block';
-    renderDailyCounts(allOrders);
-  } else if (statsWrap) {
-    statsWrap.style.display = 'none';
-  }
+  // Only admin/customer see counts
+  const statsWrap = document.getElementById('dailyStatsWrapper');
+  if (userRole === 'admin' || userRole === 'customer') {
+    if (statsWrap) statsWrap.style.display = 'block';
+    renderDailyCounts(allOrders);
+  } else if (statsWrap) {
+    statsWrap.style.display = 'none';
+  }
 }
 
 async function loadWeeklySummary() {

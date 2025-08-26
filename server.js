@@ -169,7 +169,8 @@ app.get('/api/orders', async (req, res) => {
     rawRole.startsWith('admin')    ? 'admin'    :
     rawRole.startsWith('customer') ? 'customer' : rawRole;
 
-  const user = req.headers['x-user-name'];
+  const user = req.headers['x-user-name'] || '';
+  const scopeAll = (req.query.scope === 'all');   // search uses this
 
   try {
     let sql = `
@@ -198,8 +199,9 @@ app.get('/api/orders', async (req, res) => {
     `;
     const params = [];
 
+    // role filters
     if (role === 'design') {
-      // ONLY show orders assigned to this designer. Never show unassigned.
+      // Only my assigned, still pending in design
       sql += ` AND design_done = 0 AND design_assignee = ? `;
       params.push(user);
     } else if (role === 'printing') {
@@ -211,7 +213,17 @@ app.get('/api/orders', async (req, res) => {
     } else if (role === 'shipping') {
       sql += ` AND design_done = 1 AND printing_done = 1 AND fusing_done = 1 AND stitching_done = 1 AND shipping_done = 0 `;
     }
-    // admin & customer → no extra filter (show all)
+
+    // 🔒 Persistent CUSTOMER filter (unless scope=all):
+    // hide orders where BOTH dispatch_date and design_assignee are set
+    if (role === 'customer' && !scopeAll) {
+      sql += `
+        AND NOT (
+          design_assignee IS NOT NULL AND design_assignee <> ''
+          AND dispatch_date IS NOT NULL
+        )
+      `;
+    }
 
     sql += ' ORDER BY created_at DESC';
 
@@ -225,71 +237,71 @@ app.get('/api/orders', async (req, res) => {
 
 
 
+
 /* -------- Sync Shopify Orders (Manual Refresh) -------- */
 app.post('/api/sync-orders', async (req, res) => {
-  try {
-    const shopifyRes = await axios.get(
-      `https://${SHOPIFY_STORE}/admin/api/2023-10/orders.json`,
-      {
-        headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_API_TOKEN },
-        params: { status: 'any', limit: 50 }
-      }
-    );
+ try {
+      const shopifyRes = await axios.get(
+      `https://${SHOPIFY_STORE}/admin/api/2023-10/orders.json`,
+      {
+      headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_API_TOKEN },
+      params: { status: 'any', limit: 50 }
+      }
+      );
 
-    let imported = 0;
+      let imported = 0;
 
-    for (const o of shopifyRes.data.orders) {
-      try {
-        const orderId = o.id.toString();
-        const [exists] = await pool.execute(
-          'SELECT 1 FROM `order_progress` WHERE `order_id` = ?',
-          [orderId]
-        );
+      for (const o of shopifyRes.data.orders) {
+      try {
+      const orderId = o.id.toString();
+      const [exists] = await pool.execute(
+      'SELECT 1 FROM `order_progress` WHERE `order_id` = ?',
+      [orderId]
+      );
 
-        const customerName = `${o.customer?.first_name || ''} ${o.customer?.last_name || ''}`.trim();
-        const address = o.shipping_address
-          ? `${o.shipping_address.address1 || ''}, ${o.shipping_address.city || ''}, ${o.shipping_address.province || ''}, ${o.shipping_address.country || ''}, ${o.shipping_address.zip || ''}`
-          : '';
+        const customerName = `${o.customer?.first_name || ''} ${o.customer?.last_name || ''}`.trim();
+        const address = o.shipping_address
+        ? `${o.shipping_address.address1 || ''}, ${o.shipping_address.city || ''}, ${o.shipping_address.province || ''}, ${o.shipping_address.country || ''}, ${o.shipping_address.zip || ''}`
+        : ''
+        let itemCount = 0;
+        if (Array.isArray(o.line_items)) {
+        itemCount = o.line_items.reduce((total, item) => total + item.quantity, 0);
+        }
 
-        let itemCount = 0;
-        if (Array.isArray(o.line_items)) {
-          itemCount = o.line_items.reduce((total, item) => total + item.quantity, 0);
-        }
+          if (exists.length) {
+          await pool.execute(
+          "UPDATE `order_progress` SET `item_count` = ?, `updated_at` = NOW() WHERE `order_id` = ?",
+          [itemCount, orderId]
+          );
+          } else {
+          const shopifyCreatedAt = new Date(o.created_at);
+          await pool.execute(
+          "INSERT INTO `order_progress` (`order_id`, `order_name`, `customer_name`, `total_price`, `fulfillment_status`, `payment_status`, `shipping_method`, `item_count`, `tags`, `address`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [
+        orderId, o.name, customerName,
+        o.total_price || 0,
+        o.fulfillment_status || '',
+        o.financial_status || '',
+        o.shipping_lines?.[0]?.title || '',
+        itemCount,
+        o.tags || '',
+        address,
+        shopifyCreatedAt,
+        shopifyCreatedAt
+        ]
+        );
+        imported++;
+        }
+    } catch (innerErr) {
+    console.error(`Failed to process order ${o.name || o.id}:`, innerErr);
+    }
+}
 
-        if (exists.length) {
-          await pool.execute(
-            "UPDATE `order_progress` SET `item_count` = ?, `updated_at` = NOW() WHERE `order_id` = ?",
-            [itemCount, orderId]
-          );
-        } else {
-          const shopifyCreatedAt = new Date(o.created_at);
-          await pool.execute(
-            "INSERT INTO `order_progress` (`order_id`, `order_name`, `customer_name`, `total_price`, `fulfillment_status`, `payment_status`, `shipping_method`, `item_count`, `tags`, `address`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [
-              orderId, o.name, customerName,
-              o.total_price || 0,
-              o.fulfillment_status || '',
-              o.financial_status || '',
-              o.shipping_lines?.[0]?.title || '',
-              itemCount,
-              o.tags || '',
-              address,
-              shopifyCreatedAt,
-              shopifyCreatedAt
-            ]
-          );
-          imported++;
-        }
-      } catch (innerErr) {
-        console.error(`Failed to process order ${o.name || o.id}:`, innerErr);
-      }
-    }
-
-    res.json({ success: true, imported });
-  } catch (err) {
-    console.error('Shopify sync failed:', err);
-    res.status(500).json({ success: false, error: 'Shopify sync failed' });
-  }
+    res.json({ success: true, imported });
+    } catch (err) {
+    console.error('Shopify sync failed:', err);
+    res.status(500).json({ success: false, error: 'Shopify sync failed' });
+    }
 });
 
 // ---------------- ORDERS SUMMARY METRICS (UPCOMING 7 DAYS) ----------------

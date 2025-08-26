@@ -391,12 +391,13 @@ async function loadOrders() {
 
   // FE guard (still keep)
   if (userRole === 'design') {
-    filteredOrders = allOrders.filter(o => o.design_assignee === username);
-  } else {
-    filteredOrders = allOrders; // requirement: admin + customer see ALL
-    // if you still want customer base filter, put it back here.
-    // filteredOrders = (userRole === 'customer') ? baseCustomerFilter(allOrders) : allOrders;
-  }
+  filteredOrders = allOrders.filter(o => o.design_assignee === username);
+} else if (userRole === 'customer') {
+  // FE guard (even if backend misses) -> hide ones with both set
+  filteredOrders = baseCustomerFilter(allOrders);
+} else {
+  filteredOrders = allOrders; // admin & other roles see all
+}
 
   renderTable();
 
@@ -557,10 +558,12 @@ function filterOrders(){
 
   if (!q) {
     // no query → apply base (role-aware) filter
-    if (userRole && userRole.startsWith('design_user')) {
-      filteredOrders = allOrders.filter(o => o.design_assignee === username);
-    } else {
+    if (userRole === 'design') {
+    filteredOrders = allOrders.filter(o => o.design_assignee === username);
+    } else if (userRole === 'customer') {
       filteredOrders = baseCustomerFilter(allOrders);
+    } else {
+      filteredOrders = [...allOrders];
     }
   } else {
     // query present → search across ALL orders (even hidden ones)

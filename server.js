@@ -461,9 +461,9 @@ app.get('/api/dispatch-summary-upcoming', async (req, res) => {
         SUM(CASE WHEN design_assignee='srikanth'
                   AND (design_done IS NULL OR design_done=0)
                  THEN 1 ELSE 0 END) AS srikanth,
-        SUM(CASE WHEN design_assignee='kushi'
+        SUM(CASE WHEN design_assignee='khushi'
                   AND (design_done IS NULL OR design_done=0)
-                 THEN 1 ELSE 0 END) AS kushi,
+                 THEN 1 ELSE 0 END) AS khushi,
         SUM(CASE WHEN design_assignee='shravanthi'
                   AND (design_done IS NULL OR design_done=0)
                  THEN 1 ELSE 0 END) AS shravanthi,
@@ -494,7 +494,7 @@ app.get('/api/dispatch-summary-upcoming', async (req, res) => {
       date: c.date,
       total: Number(map[c.date]?.total || 0),
       srikanth:       Number(map[c.date]?.srikanth       || 0),
-      kushi:          Number(map[c.date]?.kushi          || 0),
+      khushi:          Number(map[c.date]?.khushi          || 0),
       shravanthi:     Number(map[c.date]?.shravanthi     || 0),
       mahesh:         Number(map[c.date]?.mahesh         || 0),
       pawan:          Number(map[c.date]?.pawan          || 0),
